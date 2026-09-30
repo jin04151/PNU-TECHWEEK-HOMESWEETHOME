@@ -26,6 +26,13 @@ AVOID_TRIGGER_DISTANCE = 0.55
 # away than the trigger distance. This hysteresis prevents rapid ON/OFF changes.
 AVOID_RELEASE_DISTANCE = 0.70
 
+# Corner/dead-end recovery. If no normal avoidance trajectory is safe,
+# rotate in one chosen direction until the front opens again.
+RECOVERY_TURN_SPEED = 0.55
+RECOVERY_RELEASE_DISTANCE = 0.80
+RECOVERY_SIDE_HALF_WIDTH_DEG = 35
+RECOVERY_SIDE_SWITCH_MARGIN = 0.10
+
 # Lightweight critic weights for the local avoidance layer.
 TRACKING_WEIGHT = 1.7
 OBSTACLE_WEIGHT = 1.4
@@ -48,6 +55,8 @@ _progress_segment = 0
 # Local-avoidance state.
 _last_turn_sign = 0
 _avoidance_active = False
+_recovery_active = False
+_recovery_turn_sign = 0
 
 
 def _clamp(value, low, high):
@@ -65,6 +74,8 @@ def _reset_tracking():
     global _progress_segment
     global _last_turn_sign
     global _avoidance_active
+    global _recovery_active
+    global _recovery_turn_sign
 
     _active_path_id = None
     _path_polyline = None
@@ -72,6 +83,8 @@ def _reset_tracking():
 
     _last_turn_sign = 0
     _avoidance_active = False
+    _recovery_active = False
+    _recovery_turn_sign = 0
 
 
 def _project_point_to_segment(point, a, b):
@@ -327,6 +340,167 @@ def nearest_front_obstacle(
     return nearest
 
 
+
+def _sector_clearance(ranges, center_index, half_width_degrees):
+    """Return conservative clearance in a LiDAR sector."""
+    if not ranges:
+        return math.inf
+
+    count = len(ranges)
+    half_width = max(
+        1,
+        int(round(count * half_width_degrees / 360.0)),
+    )
+
+    values = []
+
+    for offset in range(-half_width, half_width + 1):
+        value = ranges[(center_index + offset) % count]
+
+        if math.isfinite(value) and value > 0.0:
+            values.append(value)
+
+    if not values:
+        return math.inf
+
+    # Use a low percentile instead of the absolute minimum so that a single
+    # noisy beam does not flip the recovery direction every control cycle.
+    values.sort()
+    index = min(len(values) - 1, max(0, int(0.20 * (len(values) - 1))))
+    return values[index]
+
+
+def _side_clearances(ranges):
+    """Return (left, right) LiDAR clearances.
+
+    LDS-01 convention used by the starter examples:
+      index 180 = front
+      index  90 = left
+      index 270 = right
+    """
+    if not ranges:
+        return math.inf, math.inf
+
+    count = len(ranges)
+    left_center = count // 4
+    right_center = (3 * count) // 4
+
+    left = _sector_clearance(
+        ranges,
+        left_center,
+        RECOVERY_SIDE_HALF_WIDTH_DEG,
+    )
+
+    right = _sector_clearance(
+        ranges,
+        right_center,
+        RECOVERY_SIDE_HALF_WIDTH_DEG,
+    )
+
+    return left, right
+
+
+def _choose_recovery_turn(ranges, angular_ref):
+    """Choose one recovery direction and keep it until recovery ends."""
+    left_clearance, right_clearance = _side_clearances(ranges)
+
+    # If one side is clearly more open, turn toward it.
+    if math.isinf(left_clearance) and not math.isinf(right_clearance):
+        return 1
+
+    if math.isinf(right_clearance) and not math.isinf(left_clearance):
+        return -1
+
+    if not (math.isinf(left_clearance) and math.isinf(right_clearance)):
+        if left_clearance > right_clearance + RECOVERY_SIDE_SWITCH_MARGIN:
+            return 1
+
+        if right_clearance > left_clearance + RECOVERY_SIDE_SWITCH_MARGIN:
+            return -1
+
+    # Similar clearance: prefer the direction already suggested by the
+    # global-path Pure-Pursuit command.
+    if angular_ref > 0.08:
+        return 1
+
+    if angular_ref < -0.08:
+        return -1
+
+    # If avoidance was already turning consistently, preserve that direction.
+    if _last_turn_sign:
+        return _last_turn_sign
+
+    return 1
+
+
+def _recovery_command(ranges, linear_ref, angular_ref, front_distance):
+    """Rotate out of a corner/dead-end without choosing a new side each loop."""
+    global _recovery_active
+    global _recovery_turn_sign
+    global _avoidance_active
+    global _last_turn_sign
+    global _recovery_active
+
+    # Exit recovery only after the normal path is safe again and the front
+    # has opened by a comfortable margin.
+    reference_safe, _ = _reference_trajectory_safe(
+        linear_ref,
+        angular_ref,
+    )
+
+    if (
+        _recovery_active
+        and reference_safe
+        and front_distance >= RECOVERY_RELEASE_DISTANCE
+    ):
+        _recovery_active = False
+        _recovery_turn_sign = 0
+        _avoidance_active = False
+        _last_turn_sign = 0
+
+        return linear_ref, angular_ref, 'MOVING'
+
+    if not _recovery_active:
+        _recovery_active = True
+        _recovery_turn_sign = _choose_recovery_turn(
+            ranges,
+            angular_ref,
+        )
+
+    preferred_angular = (
+        _recovery_turn_sign
+        * RECOVERY_TURN_SPEED
+    )
+
+    preferred_safe, _ = _local_costmap.trajectory_score(
+        0.0,
+        preferred_angular,
+        horizon=0.8,
+    )
+
+    if preferred_safe:
+        _last_turn_sign = _recovery_turn_sign
+        return 0.0, preferred_angular, 'MOVING'
+
+    # Only switch direction when the originally committed in-place turn is
+    # itself unsafe. This prevents LEFT/RIGHT/LEFT/RIGHT oscillation.
+    opposite_sign = -_recovery_turn_sign
+    opposite_angular = opposite_sign * RECOVERY_TURN_SPEED
+
+    opposite_safe, _ = _local_costmap.trajectory_score(
+        0.0,
+        opposite_angular,
+        horizon=0.8,
+    )
+
+    if opposite_safe:
+        _recovery_turn_sign = opposite_sign
+        _last_turn_sign = opposite_sign
+        return 0.0, opposite_angular, 'MOVING'
+
+    # There is genuinely no locally safe rotation.
+    return 0.0, 0.0, 'BLOCKED'
+
 def _candidate_commands(
     linear_ref,
     angular_ref,
@@ -397,6 +571,7 @@ def _select_local_command(
     linear_ref,
     angular_ref,
     front_distance,
+    ranges,
 ):
     """Choose an avoidance command around the pure-pursuit reference."""
     global _last_turn_sign
@@ -492,10 +667,14 @@ def _select_local_command(
             )
 
     if best is None:
-        return (
-            0.0,
-            0.0,
-            'BLOCKED',
+        # Normal local trajectories are all blocked. Instead of stopping and
+        # re-deciding LEFT/RIGHT every cycle, enter a committed corner
+        # recovery turn.
+        return _recovery_command(
+            ranges,
+            linear_ref,
+            angular_ref,
+            front_distance,
         )
 
     (
@@ -689,7 +868,32 @@ def command(
     )
 
     # ------------------------------------------------------------
-    # 5. Avoidance activation with hysteresis.
+    # 5. Corner/dead-end recovery.
+    #
+    #    Once recovery starts, keep the chosen turn direction instead of
+    #    choosing LEFT/RIGHT again on every control cycle.
+    # ------------------------------------------------------------
+
+    if _recovery_active:
+        return _recovery_command(
+            ranges,
+            linear_ref,
+            angular_ref,
+            front_distance,
+        )
+
+    # If an obstacle is extremely close in front, commit to one in-place
+    # recovery turn immediately instead of re-choosing left/right every loop.
+    if front_distance < EMERGENCY_FRONT_DISTANCE:
+        return _recovery_command(
+            ranges,
+            linear_ref,
+            angular_ref,
+            front_distance,
+        )
+
+    # ------------------------------------------------------------
+    # 6. Avoidance activation with hysteresis.
     #
     #    Enter:
     #      - obstacle closer than AVOID_TRIGGER_DISTANCE, or
@@ -719,7 +923,7 @@ def command(
         _last_turn_sign = 0
 
     # ------------------------------------------------------------
-    # 6. Normal driving:
+    # 7. Normal driving:
     #    if the global-path command is safe, use it as-is.
     #
     #    This prevents the local critic from randomly replacing
@@ -736,7 +940,7 @@ def command(
         )
 
     # ------------------------------------------------------------
-    # 7. Only while avoidance is active, evaluate alternative
+    # 8. Only while avoidance is active, evaluate alternative
     #    local trajectories and select the safest useful command.
     # ------------------------------------------------------------
 
@@ -744,5 +948,6 @@ def command(
         linear_ref,
         angular_ref,
         front_distance,
+        ranges,
     )
 
