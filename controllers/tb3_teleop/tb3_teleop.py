@@ -19,7 +19,8 @@ from global_costmap import (
 
 from localization import Localization, Pose
 from mapping import OccupancyGrid
-#from mission_manager import MissionManager
+# TODO(통합): mission_manager 구현 후 아래 임무 관련 코드와 함께 복원.
+# from mission_manager import MissionManager
 
 
 # ------------------------------------------------------------
@@ -37,7 +38,8 @@ START_POSE = None
 
 PERCEPTION_CALIBRATION = None
 PERCEPTION_ASSOCIATION = None
-TARGET_MATCH_DISTANCE_M = None
+# 동일 사과의 재관측을 연결하는 거리(m). 실제 위치 오차에 따라 조정할 초기값.
+TARGET_MATCH_DISTANCE_M = 0.3
 
 # 카메라 timestamp와 현재 simulation time의 관계가 확인되면 True.
 CAMERA_TIME_CONFIRMED = False
@@ -47,18 +49,12 @@ CAMERA_TIME_CONFIRMED = False
 # Mission configuration
 # ------------------------------------------------------------
 
-# 대회 당일 구조 대상 개수를 알게 되면 숫자로 지정.
-#
-# 예:
-# EVENT_TARGET_COUNT = 4
-#
-# 개수를 모르면 None으로 두고,
-# Exploration이 끝났을 때
-#
-# mission_manager.set_search_complete()
-#
-# 를 호출한다.
-EVENT_TARGET_COUNT = None
+# 서로 다른 빨간 사과 2개를 구출한 뒤 시작점으로 복귀.
+EVENT_TARGET_COUNT = 2
+
+# 로봇 중심과 사과 추정 위치 사이의 구출 판정 거리(m).
+# TODO(통합): 이 거리 이내에서 정지했는지 확인하는 임무 로직에 연결한다.
+RESCUE_DISTANCE_M = 0.5
 
 
 # ------------------------------------------------------------
@@ -267,11 +263,11 @@ def main():
 
     pose = localization.pose
 
-    mission_manager = None
+    # mission_manager = None
 
     # 이전 loop의 Local Planner 상태.
     # Mission FSM에서 ARRIVED 여부를 판단할 때 사용.
-    last_local_state = 'WAIT_GOAL'
+    # last_local_state = 'WAIT_GOAL'
 
 
     # ========================================================
@@ -440,22 +436,11 @@ def main():
 
                 # 최초 pose가 생성되면
                 # 시작 위치를 MissionManager에 저장.
-                if (
-                    mission_manager is None
-                    and pose is not None
-                ):
-
-                    mission_manager = (
-                        MissionManager(
-                            start_position=(
-                                pose.x,
-                                pose.y,
-                            ),
-                            required_target_count=(
-                                EVENT_TARGET_COUNT
-                            ),
-                        )
-                    )
+                # if mission_manager is None and pose is not None:
+                #     mission_manager = MissionManager(
+                #         start_position=(pose.x, pose.y),
+                #         required_target_count=EVENT_TARGET_COUNT,
+                #     )
 
 
                 # ====================================================
@@ -686,45 +671,19 @@ def main():
                 # 6. Mission FSM
                 # ====================================================
 
-                arrived = (
-                    last_local_state
-                    == 'ARRIVED'
-                )
+                # arrived = last_local_state == 'ARRIVED'
+                # if mission_manager is None:
+                #     goal = exploration_goal
+                # else:
+                #     # 탐색 완료 판정 연결 후 set_search_complete() 호출.
+                #     goal = mission_manager.update(
+                #         exploration_goal=exploration_goal,
+                #         detected_target_goal=target_goal,
+                #         arrived=arrived,
+                #     )
 
-
-                if mission_manager is None:
-
-                    goal = (
-                        exploration_goal
-                    )
-
-                else:
-
-                    # TODO(통합):
-                    #
-                    # B가
-                    # "모든 frontier 탐색 완료"
-                    # 상태를 제공하면:
-                    #
-                    # mission_manager.set_search_complete()
-                    #
-                    # 를 호출한다.
-
-
-                    goal = (
-                        mission_manager.update(
-
-                            exploration_goal=(
-                                exploration_goal
-                            ),
-
-                            detected_target_goal=(
-                                target_goal
-                            ),
-
-                            arrived=arrived,
-                        )
-                    )
+                # 임무 관리자 연결 전에는 Frontier 탐색 목표로 주행한다.
+                goal = exploration_goal
 
 
                 # ====================================================
@@ -930,9 +889,15 @@ def main():
                     )
 
 
-                last_local_state = (
-                    state
-                )
+                # 탐색 전용 실행: C의 도착 결과를 B에 전달하고 경로를 해제한다.
+                # TODO(통합): Mission FSM 복원 시 탐색 상태에서만 전달한다.
+                if state == 'ARRIVED' and goal is not None:
+                    if selector.report_result(goal, 'ARRIVED', now):
+                        current_path = None
+                        planned_goal = None
+                        path_blocked_since = None
+
+                # last_local_state = state
 
 
                 # ====================================================
@@ -1022,16 +987,11 @@ def main():
                     )
 
 
-                    mission_state = (
-
-                        mission_manager
-                        .state.name
-
-                        if mission_manager
-                        is not None
-
-                        else 'INIT'
-                    )
+                    # mission_state = (
+                    #     mission_manager.state.name
+                    #     if mission_manager is not None else 'INIT'
+                    # )
+                    mission_state = 'DISABLED'
 
 
                     write_log(

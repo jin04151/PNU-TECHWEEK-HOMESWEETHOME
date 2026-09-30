@@ -136,7 +136,8 @@ class AppleDetector:
     """YOLO11n COCO 사과 검출 → bbox별 HSV 색상/외곽선 분석.
 
     모델은 첫 검출 때 한 번 로드한다. 기본 가중치는 저장소의
-    models/YOLO/yolo11n.pt이며 실행 중 자동 다운로드하지 않는다.
+    models/YOLO/yolo11n.pt이며 없으면 Ultralytics가 최초 실행 때 다운로드한다.
+    최초 다운로드에는 인터넷 연결이 필요하며 이후에는 저장된 파일을 재사용한다.
     model 인자는 이미 로드한 Ultralytics 모델을 전달할 때 사용한다.
     confidence는 YOLO 점수이고 color_fraction은 ROI 내 색상 면적 비율이다.
     """
@@ -154,11 +155,10 @@ class AppleDetector:
 
     def _get_model(self):
         if self._model is None:
-            if not self.weights.is_file():
-                raise FileNotFoundError(
-                    f'YOLO11n COCO 가중치가 필요합니다: {self.weights}. '
-                    '파일을 배치하거나 AppleDetector(weights=...)로 지정하세요.')
             from ultralytics import YOLO
+            if not self.weights.is_file():
+                self.weights.parent.mkdir(parents=True, exist_ok=True)
+                print(f'YOLO 가중치를 다운로드합니다: {self.weights}', flush=True)
             self._model = YOLO(str(self.weights))
         return self._model
 
