@@ -509,6 +509,8 @@ class _Telemetry:
                 scan=np.round(world, 3).tolist(),
                 match=grid.match_count, failed=grid.failed_match_count,
                 response=round(grid.last_response, 3),
+                targets=[(t.target_id, t.label, round(t.position[0], 3), round(t.position[1], 3), t.status)
+                         for t in getattr(grid, 'gcs_targets', ())],
                 counts=[int((grid.data == FREE).sum()), int((grid.data == OCCUPIED).sum()),
                         int((grid.data == UNKNOWN).sum())])
             blob = b''

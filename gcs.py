@@ -31,11 +31,37 @@ from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QF
 
 HERE = Path(__file__).resolve().parent
 PORT = int(os.environ.get('AMR_GCS_PORT', '5600'))
-WEBOTS = Path(os.environ.get('LOCALAPPDATA', '')) / 'Programs/Webots/msys64/mingw64/bin/webots.exe'
-DEFAULT_WORLD = HERE / 'worlds' / 'apartment.wbt'
+DEFAULT_WORLD = 'worlds/apartment.wbt'      # gcs.py 위치 기준
+
+
+def find_webots():
+    """WEBOTS_HOME → PATH 의 webots → OS 기본 설치 위치 순서로 찾는다."""
+    import shutil
+    home = os.environ.get('WEBOTS_HOME')
+    candidates = []
+    if home:
+        candidates += [Path(home) / 'msys64/mingw64/bin/webots.exe', Path(home) / 'webots']
+    found = shutil.which('webots')
+    if found:
+        candidates.append(Path(found))
+    if sys.platform == 'win32':
+        candidates.append(Path(os.environ.get('LOCALAPPDATA', '')) / 'Programs/Webots/msys64/mingw64/bin/webots.exe')
+        candidates.append(Path(os.environ.get('ProgramFiles', 'C:/Program Files')) / 'Webots/msys64/mingw64/bin/webots.exe')
+    else:
+        candidates += [Path('/usr/local/webots/webots'), Path('/snap/bin/webots'), Path.home() / 'webots/webots']
+    return next((path for path in candidates if path.exists()), None)
+
+
+def resolve(path_text):
+    """상대 경로는 gcs.py 가 있는 폴더 기준으로 푼다."""
+    path = Path(path_text)
+    return path if path.is_absolute() else HERE / path
+
+
+WEBOTS = find_webots()
 TRAIL_LENGTH = 20000
 LOG_DIR = HERE / 'gcs_logs'
-NO_DATA_WARNING_S = 10.0
+NO_DATA_WARNING_S = 90.0      # apartment 월드는 로딩만 50초 안팎 걸린다
 ERROR_MARKERS = ('Traceback', 'Error', 'error:', 'Exception', 'crashed', 'exited with status')
 
 MAP_UNKNOWN = (58, 60, 66)
@@ -43,6 +69,9 @@ MAP_FREE = (214, 216, 220)
 MAP_OCCUPIED = (18, 18, 20)
 ROBOT_COLOR = QColor('#4aa3ff')
 SCAN_COLOR = QColor(255, 80, 80, 200)
+# 사과 상태별 색. CANDIDATE: 확인 중, DISCOVERED: 발견(확정), RESCUED: 구조 완료.
+TARGET_COLORS = {'CANDIDATE': QColor('#ffb340'), 'DISCOVERED': QColor('#ff3b30'), 'RESCUED': QColor('#4cd964')}
+TARGET_NAMES = {'CANDIDATE': '확인 중', 'DISCOVERED': '발견', 'RESCUED': '구조'}
 
 
 class MapView(QWidget):
@@ -58,7 +87,8 @@ class MapView(QWidget):
         self.pose = None
         self.robot_radius = 0.10
         self.scan = []
-        self.layers = {'map': True, 'scan': True, 'grid': True, 'trail': True}
+        self.targets = []
+        self.layers = {'map': True, 'scan': True, 'grid': True, 'trail': True, 'targets': True}
         self.center = [0.0, 0.0]
         self.scale = 60.0
         self.follow = False
@@ -72,6 +102,7 @@ class MapView(QWidget):
         self.trail.clear()
         self.pose = None
         self.scan = []
+        self.targets = []
         self.auto_fit = True
         self.update()
 
@@ -90,6 +121,7 @@ class MapView(QWidget):
         self.pose = state['pose']
         self.robot_radius = state.get('robot_radius', self.robot_radius)
         self.scan = state.get('scan', [])
+        self.targets = state.get('targets', [])
         self.trail.append((self.pose[0], self.pose[1]))
         if len(self.trail) > TRAIL_LENGTH:
             del self.trail[:len(self.trail) - TRAIL_LENGTH]
@@ -174,6 +206,21 @@ class MapView(QWidget):
                 for gy in range(math.floor(y0), math.ceil(y1) + 1):
                     painter.drawLine(self.to_screen(x0, gy), self.to_screen(x1, gy))
 
+        if self.layers['targets'] and self.targets:
+            painter.setFont(QFont('Segoe UI', 9, QFont.Weight.Bold))
+            for target_id, label, x, y, status in self.targets:
+                color = TARGET_COLORS.get(status, QColor('#ff3b30'))
+                centre = self.to_screen(x, y)
+                radius = max(7.0, 0.12 * self.scale)
+                painter.setPen(QPen(QColor('#ffffff'), 2))
+                painter.setBrush(color)
+                painter.drawEllipse(centre, radius, radius)
+                painter.setPen(QPen(QColor('#2e7d32'), 3))           # 사과 꼭지
+                painter.drawLine(centre + QPointF(0, -radius), centre + QPointF(radius * 0.4, -radius * 1.5))
+                painter.setPen(QColor('#ffffff'))
+                painter.drawText(centre + QPointF(radius + 4, 4),
+                                 f'#{target_id} {TARGET_NAMES.get(status, status)}')
+
         if self.layers['scan'] and self.scan:
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(SCAN_COLOR)
@@ -228,6 +275,7 @@ class GCS(QMainWindow):
         self.last_packet = None
         self.packets = 0
         self.ignored = set()
+        self.announced = set()
         self.started_at = None
         self.warned_no_data = False
         self.issue = None
@@ -279,7 +327,7 @@ class GCS(QMainWindow):
         self.labels = {}
         for index, (key, name) in enumerate((('link', '연결'), ('time', '경과'), ('pose', '위치'),
                                              ('heading', '방향'), ('match', '스캔 정합'),
-                                             ('map', '지도 칸'), ('issue', '문제'))):
+                                             ('map', '지도 칸'), ('targets', '사과'), ('issue', '문제'))):
             grid.addWidget(QLabel(name), index, 0)
             label = QLabel('-')
             label.setFont(QFont('Consolas', 10))
@@ -290,7 +338,8 @@ class GCS(QMainWindow):
         layer_box = QGroupBox('표시')
         layer_layout = QGridLayout(layer_box)
         for index, (key, name) in enumerate((('map', '지도'), ('scan', 'LiDAR 점'),
-                                             ('grid', '1 m 격자'), ('trail', '궤적'))):
+                                             ('grid', '1 m 격자'), ('trail', '궤적'),
+                                             ('targets', '사과'))):
             check = QCheckBox(name)
             check.setChecked(True)
             check.toggled.connect(lambda on, k=key: self._layer(k, on))
@@ -361,6 +410,7 @@ class GCS(QMainWindow):
                     self.log(f'[GCS] 다른 실행(ID {run})의 데이터는 무시합니다. Webots 가 두 개 켜져 있나요?')
                 return
             self.run_id = run
+            self.announced = set()
             self.view.reset()
             self.log(f'[GCS] 실행 ID {run} 수신 시작.')
         self.last_packet = time.monotonic()
@@ -383,6 +433,14 @@ class GCS(QMainWindow):
         done, failed = state.get('match', 0), state.get('failed', 0)
         rate = f'{100 * done / (done + failed):.0f}%' if done + failed else '-'
         self.labels['match'].setText(f'{done}/{done + failed} 성공 ({rate}), 응답 {state.get("response", 0):.2f}')
+        targets = state.get('targets', [])
+        counts = {name: sum(1 for t in targets if t[4] == key) for key, name in TARGET_NAMES.items()}
+        new = [t for t in targets if t[4] != 'CANDIDATE' and t[0] not in self.announced]
+        for target_id, label, x, y, status in new:
+            self.announced.add(target_id)
+            self.log(f'[GCS] 사과 #{target_id} {TARGET_NAMES.get(status, status)}: ({x:+.2f}, {y:+.2f}) m')
+        self.labels['targets'].setText(' · '.join(f'{name} {n}' for name, n in counts.items()) if targets
+                                       else '아직 없음')
         free, occupied, unknown = state.get('counts', (0, 0, 0))
         self.labels['map'].setText(f'빈 곳 {free} · 장애물 {occupied} · 모름 {unknown}')
 
@@ -393,7 +451,7 @@ class GCS(QMainWindow):
                     and time.monotonic() - self.started_at > NO_DATA_WARNING_S):
                 self.warned_no_data = True
                 self._set_issue(f'실행 {NO_DATA_WARNING_S:.0f}초가 지나도 데이터 없음')
-                self.log('[GCS] 원인 후보: (1) 로봇 컨트롤러가 시작하자마자 죽음 — 위 로그의 Traceback 확인, '
+                self.log('[GCS] 원인 후보: (0) 월드 로딩이 아직 안 끝남(apartment 는 50초 안팎), (1) 로봇 컨트롤러가 시작하자마자 죽음 — 위 로그의 Traceback 확인, '
                          '(2) 컨트롤러가 mapping.grid.update() 를 부르지 않음, '
                          '(3) AMR_GCS=0 으로 꺼져 있음, (4) 포트 불일치')
             return
@@ -402,7 +460,8 @@ class GCS(QMainWindow):
                                     else f'<span style="color:#ff5f57">● 끊김 ({age:.0f}s 전)</span>')
 
     def _browse(self):
-        path, _ = QFileDialog.getOpenFileName(self, '월드 선택', self.world_edit.text(), 'Webots world (*.wbt)')
+        path, _ = QFileDialog.getOpenFileName(self, '월드 선택', str(resolve(self.world_edit.text())),
+                                              'Webots world (*.wbt)')
         if path:
             self.world_edit.setText(path)
 
@@ -410,12 +469,12 @@ class GCS(QMainWindow):
         if self.process is not None:
             self.log('[GCS] 이미 실행 중입니다.')
             return
-        world = Path(self.world_edit.text())
+        world = resolve(self.world_edit.text())
         if not world.exists():
             self.log(f'[GCS] 월드 파일이 없습니다: {world}')
             return
-        if not WEBOTS.exists():
-            self.log(f'[GCS] Webots 를 찾을 수 없습니다: {WEBOTS}')
+        if WEBOTS is None:
+            self.log('[GCS] Webots 를 찾을 수 없습니다. 환경변수 WEBOTS_HOME 을 설치 폴더로 지정하세요.')
             return
         env = QProcessEnvironment.systemEnvironment()
         for name in ('QT_QPA_PLATFORM', 'QT_PLUGIN_PATH', 'QT_QPA_PLATFORM_PLUGIN_PATH'):

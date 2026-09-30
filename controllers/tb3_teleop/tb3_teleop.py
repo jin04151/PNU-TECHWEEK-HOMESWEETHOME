@@ -19,6 +19,7 @@ from global_costmap import (
 
 from localization import Localization, Pose
 from mapping import OccupancyGrid
+from recovery import Recovery
 # TODO(통합): mission_manager 구현 후 아래 임무 관련 코드와 함께 복원.
 # from mission_manager import MissionManager
 
@@ -255,6 +256,9 @@ def main():
         is not None
         else None
     )
+
+    # 벽·장애물에 붙어 못 움직일 때 후진 → 회전으로 빠져나온다.
+    recovery = Recovery()
 
 
     # ========================================================
@@ -650,6 +654,9 @@ def main():
                             now,
                         )
 
+                # GCS 지도에 발견한 사과를 표시한다(mapping.py 가 같이 보낸다).
+                grid.gcs_targets = registry.targets if registry is not None else ()
+
 
                 # ====================================================
                 # 5. B: Frontier Exploration
@@ -896,6 +903,21 @@ def main():
                         current_path = None
                         planned_goal = None
                         path_blocked_since = None
+
+                # Recovery: 갇히면 로컬 플래너 명령 대신 후진 → 회전.
+                # 끝나면 새 위치에서 다시 계획하고, 같은 목표에서 반복 실패하면 B 에 알린다.
+                override = recovery.update(now, pose, lidar_ranges, linear, angular, goal)
+                if override is not None:
+                    linear, angular = override
+                    state = f'RECOVERY_{recovery.state}'
+                if recovery.finished:
+                    current_path = None
+                    planned_goal = None
+                    path_blocked_since = None
+                    write_log(f't={now:.2f}s recovery finished count={recovery.count} '
+                              f'gave_up={recovery.gave_up} goal={goal}')
+                    if recovery.gave_up and goal is not None:
+                        selector.report_result(goal, 'BLOCKED', now)
 
                 # last_local_state = state
 

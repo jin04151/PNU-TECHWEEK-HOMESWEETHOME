@@ -147,13 +147,25 @@ class ScoringConfig:
     revisit_decay_s: float = 30.0
     switch_margin: float = 0.15
     retry_delay_s: float = 5.0
+    # 구역 유지: 고른 경계 주변을 한 구역으로 보고, 구역에 경계가 남아 있는 동안
+    # 칸 단위로 목표를 바꾸지 않는다(매초 A* 재계획·맴돌기 방지).
+    commit_radius_m: float = 1.0
+    arrive_radius_m: float = 0.35
+    blocked_grace_s: float = 2.0
+    # 진척 없음 감지: 구역을 쫓는 동안 알려진 면적이 progress_window_s 동안
+    # min_progress_m2 이상 늘지 않으면 그 구역을 blacklist_duration_s 동안 뺀다.
+    progress_window_s: float = 25.0
+    min_progress_m2: float = 0.5
+    blacklist_radius_m: float = 1.0
+    blacklist_duration_s: float = 120.0
 
     def __post_init__(self):
         for name, value in vars(self).items():
             if not math.isfinite(value) or value < 0:
                 raise ValueError(f'{name}은 유한한 0 이상의 값이어야 합니다.')
         for name in ('observation_radius_m', 'distance_scale_m', 'revisit_radius_m',
-                     'revisit_decay_s', 'retry_delay_s'):
+                     'revisit_decay_s', 'retry_delay_s', 'commit_radius_m',
+                     'progress_window_s', 'blacklist_radius_m', 'blacklist_duration_s'):
             if getattr(self, name) == 0:
                 raise ValueError(f'{name}은 0보다 커야 합니다.')
 
@@ -238,6 +250,12 @@ class FrontierSelector:
         self._last_time = None
         self._pending_reason = None
         self._retry_after = {}
+        self.region = None               # 지금 쫓는 구역의 기준점 (x, y)
+        self.blacklist = []              # [((x, y), 해제 시각)]
+        self.reached = []                # 도착했지만 아직 경계인 목표 [((x, y), 해제 시각)]
+        self._progress_area = 0.0
+        self._progress_since = 0.0
+        self._empty_since = None
 
     def _time(self, now):
         if not math.isfinite(now):
@@ -263,31 +281,125 @@ class FrontierSelector:
         self.goal = None
         return True
 
+    def _blacklisted(self, point):
+        return (any(math.dist(point, center) <= self.config.blacklist_radius_m
+                    for center, _ in self.blacklist)
+                or any(math.dist(point, center) <= self.config.arrive_radius_m
+                       for center, _ in self.reached))
+
+    def _commit(self, candidate, known_m2, now):
+        """새 구역을 쫓기 시작한다. 진척 감시도 새로 시작한다."""
+        self.goal = candidate.goal
+        self.region = candidate.goal
+        self._progress_area = known_m2
+        self._progress_since = now
+
     def choose(self, grid, safe_grid, pose, now, *, allow_switch=True):
-        """최신 지도에서 현재 목표도 재평가하고 변경 기준을 적용한다."""
+        """최신 지도에서 목표를 고른다.
+
+        한 구역(commit_radius_m)을 고르면 그 구역에 경계가 남아 있는 동안 목표를
+        칸 단위로 바꾸지 않는다. 구역을 쫓는 동안 알려진 면적이 늘지 않으면
+        (progress_window_s 동안 min_progress_m2 미만) 그 구역을 잠시 뺀다.
+        """
+        config = self.config
         self._time(now)
         self.visits = [(point, time) for point, time in self.visits
-                       if now-time < self.config.revisit_decay_s]
+                       if now-time < config.revisit_decay_s]
         self._retry_after = {point: time for point, time in self._retry_after.items() if now < time}
-        self.candidates = evaluate_candidates(grid, safe_grid, pose, self.config, self.visits, now)
-        eligible = [c for c in self.candidates if c.goal not in self._retry_after]
-        current = next((c for c in eligible if c.goal == self.goal), None)
-        if (self.goal is not None and math.dist(self.goal, (pose.x, pose.y)) <= grid.resolution / 2
+        self.blacklist = [(center, until) for center, until in self.blacklist if now < until]
+        self.reached = [(center, until) for center, until in self.reached if now < until]
+        self.candidates = evaluate_candidates(grid, safe_grid, pose, config, self.visits, now)
+        known_m2 = float(np.count_nonzero(grid.data != UNKNOWN)) * grid.resolution ** 2
+        position = (pose.x, pose.y)
+
+        # A. 진척 없음 감지: 같은 구역을 쫓는데 지도가 늘지 않으면 그 구역을 뺀다.
+        if self.region is not None:
+            if known_m2 - self._progress_area >= config.min_progress_m2:
+                self._progress_area, self._progress_since = known_m2, now
+            elif now - self._progress_since >= config.progress_window_s:
+                self.blacklist.append((self.region, now + config.blacklist_duration_s))
+                self._pending_reason = (f'진척 없음 {config.progress_window_s:.0f}s: 구역 '
+                                        f'({self.region[0]:.1f},{self.region[1]:.1f}) '
+                                        f'{config.blacklist_duration_s:.0f}s 제외')
+                self.region = None
+                self.goal = None
+
+        eligible = [c for c in self.candidates
+                    if c.goal not in self._retry_after and not self._blacklisted(c.goal)]
+
+        # 시작 셀이 잠깐 차단되는 등으로 후보 계산이 안 되면 현재 목표를 잠시 유지한다.
+        if not self.candidates and self.goal is not None:
+            if self._empty_since is None:
+                self._empty_since = now
+            if now - self._empty_since < config.blocked_grace_s:
+                self.reason = '후보 계산 불가(시작 셀 차단 등): 현재 목표 잠시 유지'
+                return self.goal
+        else:
+            self._empty_since = None
+
+        if (self.goal is not None and math.dist(self.goal, position) <= grid.resolution / 2
                 and goal_is_valid(grid, safe_grid, pose, self.goal)):
             self.reason = '도착 범위: 통합 담당의 도착 확인 대기'
             return self.goal
+
         previous = self.goal
         if not eligible:
             self.goal = None
-            self.reason = self._pending_reason or ('실패 목표 재시도 대기' if self.candidates else '유효한 후보 없음')
-        else:
-            best = min(eligible, key=_rank)
-            if current is not None and (not allow_switch or best.score <= current.score + self.config.switch_margin):
-                self.reason = '유효한 현재 목표 유지' if not allow_switch else '현재 목표 유지: 점수 개선 폭이 변경 기준 이하'
-            else:
-                self.goal = best.goal
-                self.reason = (self._pending_reason or ('첫 목표 선택' if previous is None
-                               else '목표 무효 후 재선택' if current is None else '더 높은 점수로 변경'))
+            self.region = None
+            self.reason = self._pending_reason or (
+                '실패·진척없음 구역 대기' if self.candidates else '유효한 후보 없음')
+            self._pending_reason = None
+            return None
+
+        # D. 구역 유지: 구역에 경계가 남아 있으면 그 안에서만 움직인다.
+        if self.region is not None:
+            local = [c for c in eligible if math.dist(c.goal, self.region) <= config.commit_radius_m]
+            if local:
+                arrived = self.goal is not None and math.dist(self.goal, position) <= config.arrive_radius_m
+                still_frontier = any(c.goal == self.goal for c in eligible)
+                if (self.goal is not None and not arrived
+                        and (still_frontier or goal_is_valid(grid, safe_grid, pose, self.goal,
+                                                             frontier=False))):
+                    self.reason = '구역 유지: 현재 목표 유지'
+                    self._pending_reason = None
+                    return self.goal
+                if arrived:
+                    # 가 봤는데도 아직 경계인 칸은 한동안 다시 고르지 않는다(칸 사이 핑퐁 방지).
+                    self.reached.append((self.goal, now + config.blacklist_duration_s))
+                    local = [c for c in local if not self._blacklisted(c.goal)]
+                ahead = [c for c in local if math.dist(c.goal, position) > config.arrive_radius_m]
+                if not ahead:
+                    self.region = None
+                    return self.choose_new_region(grid, pose, eligible, known_m2, now, previous)
+                self.goal = min(ahead, key=_rank).goal
+                self.region = self.goal
+                self.reason = self._pending_reason or '구역 유지: 같은 구역의 다음 경계'
+                self._pending_reason = None
+                return self.goal
+
+        # 구역이 없거나 다 풀렸으면 전체에서 새 구역을 고른다.
+        current = next((c for c in eligible if c.goal == self.goal), None)
+        best = min(eligible, key=_rank)
+        if current is not None and (not allow_switch
+                                    or best.score <= current.score + self.config.switch_margin):
+            self._commit(current, known_m2, now)
+            self.reason = '유효한 현재 목표 유지'
+            self._pending_reason = None
+            return self.goal
+        return self.choose_new_region(grid, pose, eligible, known_m2, now, previous)
+
+    def choose_new_region(self, grid, pose, eligible, known_m2, now, previous):
+        """제외 목록을 뺀 후보 중 최고 점수로 새 구역을 시작한다."""
+        eligible = [c for c in eligible if not self._blacklisted(c.goal)]
+        if not eligible:
+            self.goal = None
+            self.region = None
+            self.reason = self._pending_reason or '실패·진척없음 구역 대기'
+            self._pending_reason = None
+            return None
+        self._commit(min(eligible, key=_rank), known_m2, now)
+        self.reason = self._pending_reason or ('첫 목표 선택' if previous is None
+                                               else '구역 소진 후 새 구역 선택')
         self._pending_reason = None
         return self.goal
 

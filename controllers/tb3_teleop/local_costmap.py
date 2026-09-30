@@ -96,17 +96,7 @@ class LocalCostmap:
         return int(self.costmap[cell])
 
     def trajectory_score(self, linear, angular, horizon=1.0, dt=0.10):
-        """Return (safe, normalized_obstacle_cost) for a candidate trajectory.
-
-        The robot can occasionally already be standing in a center grid cell
-        marked INSCRIBED because obstacle inflation is discretized onto a
-        5-cm grid.  Rejecting that cell immediately would also reject every
-        in-place recovery rotation.  Therefore only the *current center cell*
-        gets an INSCRIBED exception while the robot is escaping it.
-
-        OCCUPIED (254), UNKNOWN (255), and every other INSCRIBED cell remain
-        blocked.
-        """
+        """Return (safe, normalized_obstacle_cost) for a candidate trajectory."""
         x = 0.0
         y = 0.0
         theta = 0.0
@@ -114,7 +104,6 @@ class LocalCostmap:
         samples = 0
 
         steps = max(1, int(math.ceil(horizon / dt)))
-        start_cell = self.robot_to_grid(0.0, 0.0)
 
         for _ in range(steps):
             if abs(angular) < 1e-9:
@@ -126,20 +115,7 @@ class LocalCostmap:
                 y += linear * math.sin(theta_mid) * dt
                 theta += angular * dt
 
-            cell = self.robot_to_grid(x, y)
-            if cell is None:
-                return False, math.inf
-
-            cost = int(self.costmap[cell])
-
-            # Start-cell exception: the physical robot is already here.
-            # Allow only an INSCRIBED (253) center cell so the controller can
-            # rotate or move out.  A real occupied/unknown cell is never freed.
-            if (
-                cell == start_cell
-                and cost == int(INSCRIBED_COST)
-            ):
-                cost = 0
+            cost = self.cost_at(x, y)
 
             if cost >= int(INSCRIBED_COST):
                 return False, math.inf
@@ -148,4 +124,3 @@ class LocalCostmap:
             samples += 1
 
         return True, accumulated / max(samples, 1)
-
