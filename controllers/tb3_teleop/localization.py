@@ -60,6 +60,10 @@ class Localization:
             dtype=float)
         self.covariance = np.diag(INITIAL_STD ** 2)
         self.pose = Pose(start.x, start.y, wrap_angle(start.theta))
+        # mapping.OccupancyGrid 가 localization 인자 없이 만들어져도 이 pose 를 보고
+        # EKF 에 자동으로 연결되게 한다(그래야 스캔 정합 보정이 다음 스텝에 지워지지 않는다).
+        self.pose._owner = self
+        self.slip_count = 0
 
         self.previous_left = None
         self.previous_right = None
@@ -217,6 +221,14 @@ class Localization:
                                  observed_bearing, LANDMARK_RANGE_STD,
                                  LANDMARK_BEARING_STD)
             self.camera.used += 1
+        return self._sync_pose()
+
+    def hold_position(self, x, y):
+        """바퀴 헛돎이 감지됐을 때 위치를 되돌리고 속도를 0 으로 둔다. 방향은 자이로를 믿는다."""
+        self.state[X] = float(x)
+        self.state[Y] = float(y)
+        self.state[V] = 0.0
+        self.slip_count += 1
         return self._sync_pose()
 
     def update_position(self, x, y, std=0.1):

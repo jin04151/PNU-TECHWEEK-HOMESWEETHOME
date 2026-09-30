@@ -56,6 +56,18 @@ SCAN_MEDIAN_BIN_RAD = math.radians(1.0)
 SCAN_MEDIAN_GATE_M = 0.30
 SCAN_MEDIAN_MIN_POINTS = 3
 
+# 바퀴 헛돎 감지: 엔코더가 SLIP_MIN_MOVE_M 넘게 갔다는데 진행 방향 앞뒤 벽까지의
+# 거리가 그 SLIP_RATIO 만큼도 안 변했으면 헛돈 것으로 보고 위치를 붙잡는다.
+SLIP_DETECT = True
+SLIP_MIN_MOVE_M = 0.06
+SLIP_RATIO = 0.3
+SLIP_BIN_RAD = math.radians(2.0)
+SLIP_SECTOR_RAD = math.radians(30.0)
+SLIP_MAX_RANGE_M = 3.3
+SLIP_MIN_BINS = 5
+SLIP_REFRESH_M = 0.10
+SLIP_REFRESH_RAD = 0.10
+
 
 class OccupancyGrid:
     def __init__(self, rows=121, cols=121, resolution=0.1,
@@ -91,6 +103,9 @@ class OccupancyGrid:
 
         self._footprint = _disk_offsets(ROBOT_RADIUS, self.resolution)
         self._telemetry = _Telemetry() if GCS_ENABLED else None
+        self._slip_ref = None            # (거리 프로필, x, y, theta)
+        self.slipping = False
+        self.slip_count = 0
 
     def bind_localization(self, localization):
         self.localization = localization
@@ -112,11 +127,21 @@ class OccupancyGrid:
         return x, y
 
     def update(self, pose, lidar_points):
+        if self.localization is None:
+            self.localization = getattr(pose, '_owner', None)
         x, y, theta = float(pose.x), float(pose.y), float(pose.theta)
         if not all(math.isfinite(value) for value in (x, y, theta)):
             raise ValueError("로봇 자세에 유효하지 않은 값이 있습니다.")
 
         points, is_obstacle = self._collect_points(lidar_points)
+
+        if SLIP_DETECT and self._check_slip(pose, points, is_obstacle):
+            # 헛도는 동안은 위치를 붙잡고 지도에 쓰지 않는다. 버퍼의 점도 틀린 자세라 버린다.
+            self._buffer.clear()
+            self._last_match_pose = (pose.x, pose.y, pose.theta)
+            if self._telemetry is not None:
+                self._telemetry.send(self, pose.x, pose.y, pose.theta, points, is_obstacle)
+            return self.data
 
         if points.size and is_obstacle.any():
             self._buffer.append(
@@ -348,6 +373,67 @@ class OccupancyGrid:
     def _inside(self, row, col):
         return ((row >= 0) & (row < self.rows) &
                 (col >= 0) & (col < self.cols))
+
+    def _range_profile(self, points, is_obstacle):
+        """방향(SLIP_BIN_RAD 칸)별 가장 가까운 장애물 거리. 없으면 inf."""
+        bins = int(round(2.0 * math.pi / SLIP_BIN_RAD))
+        profile = np.full(bins, np.inf)
+        if points.size and is_obstacle.any():
+            obstacle = points[is_obstacle]
+            distance = np.hypot(obstacle[:, 0], obstacle[:, 1])
+            index = ((np.arctan2(obstacle[:, 1], obstacle[:, 0]) + math.pi) / SLIP_BIN_RAD).astype(np.int64) % bins
+            np.minimum.at(profile, index, distance)
+        return profile
+
+    def _check_slip(self, pose, points, is_obstacle):
+        """바퀴가 헛돌고 있으면 True. 헛돎이 확인되면 위치를 기준점으로 되돌린다.
+
+        엔코더가 말하는 이동을 진행 방향 앞뒤의 LiDAR 거리 변화와 비교한다.
+        앞뒤 SLIP_MAX_RANGE_M 안에 벽이 없어 판단할 수 없으면 헛돎으로 보지 않는다.
+        """
+        profile = self._range_profile(points, is_obstacle)
+        x, y, theta = pose.x, pose.y, pose.theta
+        if self._slip_ref is None:
+            self._slip_ref = (profile, x, y, theta)
+            return False
+        reference, ref_x, ref_y, ref_theta = self._slip_ref
+        dx, dy = x - ref_x, y - ref_y
+        moved = math.hypot(dx, dy)
+        turned = _wrap(theta - ref_theta)
+        if moved < SLIP_MIN_MOVE_M:
+            if not self.slipping and abs(turned) > SLIP_REFRESH_RAD:
+                self._slip_ref = (profile, x, y, theta)
+            return self.slipping          # 헛돎 의심 중에는 판단이 날 때까지 지도에 쓰지 않는다
+
+        cosine, sine = math.cos(ref_theta), math.sin(ref_theta)
+        heading = math.atan2(-sine * dx + cosine * dy, cosine * dx + sine * dy)
+        bins = len(profile)
+        current = np.roll(profile, int(round(turned / SLIP_BIN_RAD)))   # 기준 시점의 로봇 좌표로 맞춘다
+        angles = -math.pi + (np.arange(bins) + 0.5) * SLIP_BIN_RAD
+        near = ((reference < SLIP_MAX_RANGE_M) & (current < SLIP_MAX_RANGE_M))
+        sector = ((np.abs(_wrap(angles - heading)) <= SLIP_SECTOR_RAD)
+                  | (np.abs(_wrap(angles - heading - math.pi)) <= SLIP_SECTOR_RAD))
+        valid = near & sector
+        if int(valid.sum()) < SLIP_MIN_BINS:
+            self.slipping = False
+            self._slip_ref = (profile, x, y, theta)
+            return False
+
+        expected = -moved * np.cos(angles[valid] - heading)
+        ratio = float(np.median((current[valid] - reference[valid]) / expected))
+        if ratio < SLIP_RATIO:
+            self.slipping = True
+            self.slip_count += 1
+            if self.localization is not None and hasattr(self.localization, 'hold_position'):
+                self.localization.hold_position(ref_x, ref_y)
+            else:
+                pose.x, pose.y = ref_x, ref_y
+            return True
+
+        self.slipping = False
+        if moved > SLIP_REFRESH_M or abs(turned) > SLIP_REFRESH_RAD:
+            self._slip_ref = (profile, x, y, theta)
+        return False
 
     def _clear_footprint(self, x, y):
         row, col = self._to_cells(np.array([x]), np.array([y]))

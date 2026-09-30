@@ -1,8 +1,0 @@
-17:47:42 [GCS] 로그 파일: C:\Users\woosu\OneDrive\Desktop\hkton\gcs_logs\gcs_20260930_174740.log
-17:47:42 [GCS] UDP 127.0.0.1:5601 수신 대기.
-17:47:43 [GCS] 실행: C:\Users\woosu\OneDrive\Desktop\hkton\worlds\apartment.wbt (고속 (Webots 화면 없음)), 포트 5601
-17:47:43 WARNING: Could not listen to extern controllers and robot windows on port 1235. Port 1235 is already in use. Using port 1236 instead. This could be caused by another running instance of Webots. You should use the '--port' option to start several instances of Webots.
-17:47:43 WARNING: Could not listen to extern controllers and robot windows on port 1234. Port 1234 is already in use. Using port 1236 instead. This could be caused by another running instance of Webots. You should use the '--port' option to start several instances of Webots.
-17:47:53 [GCS][문제] 실행 10초가 지나도 데이터 없음
-17:47:53 [GCS] 원인 후보: (1) 로봇 컨트롤러가 시작하자마자 죽음 — 위 로그의 Traceback 확인, (2) 컨트롤러가 mapping.grid.update() 를 부르지 않음, (3) AMR_GCS=0 으로 꺼져 있음, (4) 포트 불일치
-17:48:23 [GCS] Webots 종료 (코드 1), 받은 패킷 0개.
