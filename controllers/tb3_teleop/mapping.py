@@ -1,5 +1,11 @@
 from collections import deque
+import json
 import math
+import os
+import socket
+import struct
+import time
+import zlib
 
 import numpy as np
 from PIL import Image
@@ -30,6 +36,13 @@ LIDAR_BEARING_OFFSET = 0.0
 FREE_SAMPLE_FACTOR = 0.5
 
 SAFETY_RADIUS = 0.5
+ROBOT_RADIUS = 0.10
+
+GCS_ENABLED = os.environ.get('AMR_GCS', '1') != '0'
+GCS_PORT = int(os.environ.get('AMR_GCS_PORT', '5600'))
+GCS_PERIOD = 0.2
+GCS_MAP_PERIOD = 1.0
+GCS_MAX_POINTS = 400
 
 SMEAR_DEVIATION = 0.10
 SMEAR_MIN_WEIGHT = 0.05
@@ -76,6 +89,9 @@ class OccupancyGrid:
         self._safe_grid = None
         self._safe_key = None
 
+        self._footprint = _disk_offsets(ROBOT_RADIUS, self.resolution)
+        self._telemetry = _Telemetry() if GCS_ENABLED else None
+
     def bind_localization(self, localization):
         self.localization = localization
 
@@ -111,7 +127,10 @@ class OccupancyGrid:
             x, y, theta = corrected
 
         self._integrate(points, is_obstacle, x, y, theta)
+        self._clear_footprint(x, y)
         self._refresh_data()
+        if self._telemetry is not None:
+            self._telemetry.send(self, x, y, theta, points, is_obstacle)
         return self.data
 
     def make_safe_grid(self, clearance_m: float) -> np.ndarray:
@@ -212,7 +231,7 @@ class OccupancyGrid:
                                 offset_sin * local_x + offset_cos * local_y)
 
             planar_range = math.hypot(local_x, local_y)
-            if planar_range < MIN_RANGE:
+            if planar_range < max(MIN_RANGE, ROBOT_RADIUS):
                 continue
 
             height = LIDAR_Z + local_z
@@ -329,6 +348,14 @@ class OccupancyGrid:
     def _inside(self, row, col):
         return ((row >= 0) & (row < self.rows) &
                 (col >= 0) & (col < self.cols))
+
+    def _clear_footprint(self, x, y):
+        row, col = self._to_cells(np.array([x]), np.array([y]))
+        rows = row[0] + self._footprint[:, 0]
+        cols = col[0] + self._footprint[:, 1]
+        inside = self._inside(rows, cols)
+        rows, cols = rows[inside], cols[inside]
+        self.log_odds[rows, cols] = np.minimum(self.log_odds[rows, cols], FREE_THRESHOLD)
 
     def _refresh_data(self):
         updated = np.full(self.data.shape, UNKNOWN, dtype=np.int8)
@@ -448,6 +475,53 @@ def _median_by_bearing(points, bin_rad):
 
 def _wrap(angle):
     return (angle + math.pi) % (2.0 * math.pi) - math.pi
+
+
+def _disk_offsets(radius, resolution):
+    cells = int(math.ceil(radius / resolution))
+    offsets = [(dr, dc) for dr in range(-cells, cells + 1) for dc in range(-cells, cells + 1)
+               if math.hypot(dr, dc) * resolution <= radius]
+    return np.array(offsets, dtype=np.int64).reshape(-1, 2)
+
+
+class _Telemetry:
+    def __init__(self):
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.socket.setblocking(False)
+        self.run_id = os.environ.get('AMR_GCS_RUN_ID') or str(os.getpid())
+        self.next_send = 0.0
+        self.next_map = 0.0
+        self.started = time.monotonic()
+
+    def send(self, grid, x, y, theta, points, is_obstacle):
+        now = time.monotonic()
+        if now < self.next_send:
+            return
+        self.next_send = now + GCS_PERIOD
+        try:
+            scan = points[is_obstacle] if points.size else points
+            if len(scan) > GCS_MAX_POINTS:
+                scan = scan[::len(scan) // GCS_MAX_POINTS + 1]
+            world = _to_world(scan, x, y, theta) if len(scan) else scan
+            header = dict(
+                run=self.run_id, wall=round(now - self.started, 2),
+                pose=(x, y, theta), robot_radius=ROBOT_RADIUS,
+                scan=np.round(world, 3).tolist(),
+                match=grid.match_count, failed=grid.failed_match_count,
+                response=round(grid.last_response, 3),
+                counts=[int((grid.data == FREE).sum()), int((grid.data == OCCUPIED).sum()),
+                        int((grid.data == UNKNOWN).sum())])
+            blob = b''
+            if now >= self.next_map:
+                self.next_map = now + GCS_MAP_PERIOD
+                header['map'] = dict(rows=grid.rows, cols=grid.cols, resolution=grid.resolution,
+                                     origin_row=grid.origin_row, origin_col=grid.origin_col)
+                blob = zlib.compress(grid.data.tobytes(), 3)
+            text = json.dumps(header, separators=(',', ':')).encode('utf-8')
+            self.socket.sendto(b'AMR2' + struct.pack('<I', len(text)) + text + blob,
+                               ('127.0.0.1', GCS_PORT))
+        except (OSError, ValueError):
+            pass
 
 
 COARSE_RANGE_M = 0.30
