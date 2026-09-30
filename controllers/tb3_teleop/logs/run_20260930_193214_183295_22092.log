@@ -1,0 +1,8 @@
+t=0.06s goal_change=None->(0.1, 0.0) reason=호출자가 첫 목표를 선택함
+t=0.06s exploration known_area_m2=0.050 frontier_groups=4 reachable_candidates=4 goal=(0.100,0.000) odom_distance_m=0.000 reason=안전한 Frontier 후보 있음 selection_reason=첫 목표 선택 goal_reached=N/A planning_failures=N/A
+t=0.06s frontier_score cell=(100, 101) goal=(0.1, 0.0) gain_m2=6.920 distance_m=0.100 turn_rad=0.000 revisit=0.000 score=2.945 selected=True
+t=0.06s frontier_score cell=(99, 100) goal=(0.0, -0.1) gain_m2=6.920 distance_m=0.100 turn_rad=1.571 revisit=0.000 score=2.795 selected=False
+t=0.06s frontier_score cell=(101, 100) goal=(0.0, 0.1) gain_m2=6.920 distance_m=0.100 turn_rad=1.571 revisit=0.000 score=2.795 selected=False
+t=0.06s frontier_score cell=(100, 99) goal=(-0.1, 0.0) gain_m2=6.920 distance_m=0.100 turn_rad=3.142 revisit=0.000 score=2.645 selected=False
+t=0.06s state=ARRIVED mission=DISABLED front=1.94m pose=(+0.00, +0.00, +0.0deg) goal=(0.1, 0.0) detections=0 located=0 targets=0 perception=WAIT_CALIBRATION
+t=0.58s map_saved=C:\Users\woosu\OneDrive\Desktop\hkton\controllers\tb3_teleop\maps\map.png final

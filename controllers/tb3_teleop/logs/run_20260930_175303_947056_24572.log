@@ -1,0 +1,153 @@
+t=0.06s goal_change=None->(0.1, 0.0) reason=호출자가 첫 목표를 선택함
+t=0.06s exploration known_area_m2=0.050 frontier_groups=4 reachable_candidates=4 goal=(0.100,0.000) odom_distance_m=0.000 reason=안전한 Frontier 후보 있음 selection_reason=첫 목표 선택 goal_reached=N/A planning_failures=N/A
+t=0.06s frontier_score cell=(100, 101) goal=(0.1, 0.0) gain_m2=6.920 distance_m=0.100 turn_rad=0.000 revisit=0.000 score=2.945 selected=True
+t=0.06s frontier_score cell=(99, 100) goal=(0.0, -0.1) gain_m2=6.920 distance_m=0.100 turn_rad=1.571 revisit=0.000 score=2.795 selected=False
+t=0.06s frontier_score cell=(101, 100) goal=(0.0, 0.1) gain_m2=6.920 distance_m=0.100 turn_rad=1.571 revisit=0.000 score=2.795 selected=False
+t=0.06s frontier_score cell=(100, 99) goal=(-0.1, 0.0) gain_m2=6.920 distance_m=0.100 turn_rad=3.142 revisit=0.000 score=2.645 selected=False
+t=0.06s state=ARRIVED mission=DISABLED front=1.94m pose=(+0.00, +0.00, +0.0deg) goal=(0.1, 0.0) detections=0 located=0 targets=0 perception=WAIT_CALIBRATION
+t=0.13s goal_change=(0.1, 0.0)->(0.0, -0.1) reason=호출자가 목표를 변경함
+t=0.19s goal_change=(0.0, -0.1)->(0.0, 0.1) reason=호출자가 목표를 변경함
+t=0.26s goal_change=(0.0, 0.1)->(0.1, 0.0) reason=호출자가 목표를 변경함
+t=0.51s goal_change=(0.1, 0.0)->(-0.1, 0.0) reason=호출자가 목표를 변경함
+t=0.58s goal_change=(-0.1, 0.0)->(0.1, 0.0) reason=호출자가 목표를 변경함
+t=0.70s goal_change=(0.1, 0.0)->None reason=도달 가능한 후보 없음
+t=0.83s goal_change=None->(0.7000000000000001, -2.2) reason=호출자가 첫 목표를 선택함
+t=1.02s exploration known_area_m2=5.460 frontier_groups=39 reachable_candidates=76 goal=(0.700,-2.200) odom_distance_m=0.008 reason=안전한 Frontier 후보 있음 selection_reason=유효한 현재 목표 유지 goal_reached=N/A planning_failures=N/A
+t=1.02s frontier_score cell=(78, 107) goal=(0.7000000000000001, -2.2) gain_m2=5.450 distance_m=2.900 turn_rad=0.032 revisit=0.000 score=1.376 selected=True
+t=1.02s frontier_score cell=(79, 107) goal=(0.7000000000000001, -2.1) gain_m2=5.320 distance_m=2.800 turn_rad=0.032 revisit=0.000 score=1.353 selected=False
+t=1.02s frontier_score cell=(80, 107) goal=(0.7000000000000001, -2.0) gain_m2=5.160 distance_m=2.700 turn_rad=0.032 revisit=0.000 score=1.318 selected=False
+t=1.02s frontier_score cell=(106, 129) goal=(2.9000000000000004, 0.6000000000000001) gain_m2=5.740 distance_m=3.500 turn_rad=0.032 revisit=0.000 score=1.301 selected=False
+t=1.02s frontier_score cell=(106, 128) goal=(2.8000000000000003, 0.6000000000000001) gain_m2=5.660 distance_m=3.400 turn_rad=0.032 revisit=0.000 score=1.300 selected=False
+t=1.02s state=MOVING mission=DISABLED front=1.87m pose=(+0.01, -0.00, -1.8deg) goal=(0.7000000000000001, -2.2) detections=0 located=0 targets=0 perception=WAIT_CALIBRATION
+t=2.05s exploration known_area_m2=5.600 frontier_groups=36 reachable_candidates=68 goal=(0.700,-2.200) odom_distance_m=0.048 reason=안전한 Frontier 후보 있음 selection_reason=유효한 현재 목표 유지 goal_reached=N/A planning_failures=N/A
+t=2.05s frontier_score cell=(78, 107) goal=(0.7000000000000001, -2.2) gain_m2=5.380 distance_m=2.900 turn_rad=0.192 revisit=0.000 score=1.331 selected=True
+t=2.05s frontier_score cell=(79, 107) goal=(0.7000000000000001, -2.1) gain_m2=5.240 distance_m=2.800 turn_rad=0.192 revisit=0.000 score=1.304 selected=False
+t=2.05s frontier_score cell=(80, 107) goal=(0.7000000000000001, -2.0) gain_m2=5.090 distance_m=2.700 turn_rad=0.192 revisit=0.000 score=1.272 selected=False
+t=2.05s frontier_score cell=(106, 129) goal=(2.9000000000000004, 0.6000000000000001) gain_m2=5.700 distance_m=3.500 turn_rad=0.192 revisit=0.000 score=1.268 selected=False
+t=2.05s frontier_score cell=(106, 128) goal=(2.8000000000000003, 0.6000000000000001) gain_m2=5.610 distance_m=3.400 turn_rad=0.192 revisit=0.000 score=1.263 selected=False
+t=2.05s state=MOVING mission=DISABLED front=1.68m pose=(+0.05, -0.00, -11.0deg) goal=(0.7000000000000001, -2.2) detections=0 located=0 targets=0 perception=WAIT_CALIBRATION
+t=3.01s exploration known_area_m2=5.710 frontier_groups=36 reachable_candidates=72 goal=(0.700,-2.200) odom_distance_m=0.087 reason=안전한 Frontier 후보 있음 selection_reason=유효한 현재 목표 유지 goal_reached=N/A planning_failures=N/A
+t=3.01s frontier_score cell=(78, 107) goal=(0.7000000000000001, -2.2) gain_m2=5.340 distance_m=2.800 turn_rad=0.319 revisit=0.000 score=1.335 selected=True
+t=3.01s frontier_score cell=(79, 107) goal=(0.7000000000000001, -2.1) gain_m2=5.220 distance_m=2.700 turn_rad=0.319 revisit=0.000 score=1.316 selected=False
+t=3.01s frontier_score cell=(106, 129) goal=(2.9000000000000004, 0.6000000000000001) gain_m2=5.640 distance_m=3.400 turn_rad=0.319 revisit=0.000 score=1.264 selected=False
+t=3.01s frontier_score cell=(106, 128) goal=(2.8000000000000003, 0.6000000000000001) gain_m2=5.550 distance_m=3.300 turn_rad=0.319 revisit=0.000 score=1.258 selected=False
+t=3.01s frontier_score cell=(106, 127) goal=(2.7, 0.6000000000000001) gain_m2=5.460 distance_m=3.200 turn_rad=0.319 revisit=0.000 score=1.253 selected=False
+t=3.01s state=MOVING mission=DISABLED front=1.34m pose=(+0.09, -0.01, -18.3deg) goal=(0.7000000000000001, -2.2) detections=0 located=0 targets=0 perception=WAIT_CALIBRATION
+t=3.14s goal_change=(0.7000000000000001, -2.2)->(0.7000000000000001, -2.1) reason=호출자가 목표를 변경함
+t=4.03s exploration known_area_m2=5.870 frontier_groups=40 reachable_candidates=79 goal=(0.700,-2.100) odom_distance_m=0.128 reason=안전한 Frontier 후보 있음 selection_reason=유효한 현재 목표 유지 goal_reached=N/A planning_failures=N/A
+t=4.03s frontier_score cell=(79, 107) goal=(0.7000000000000001, -2.1) gain_m2=5.180 distance_m=2.700 turn_rad=0.455 revisit=0.000 score=1.286 selected=True
+t=4.03s frontier_score cell=(80, 106) goal=(0.6000000000000001, -2.0) gain_m2=5.040 distance_m=2.700 turn_rad=0.455 revisit=0.000 score=1.226 selected=False
+t=4.03s frontier_score cell=(106, 129) goal=(2.9000000000000004, 0.6000000000000001) gain_m2=5.570 distance_m=3.400 turn_rad=0.455 revisit=0.000 score=1.221 selected=False
+t=4.03s frontier_score cell=(106, 128) goal=(2.8000000000000003, 0.6000000000000001) gain_m2=5.470 distance_m=3.300 turn_rad=0.455 revisit=0.000 score=1.211 selected=False
+t=4.03s frontier_score cell=(106, 127) goal=(2.7, 0.6000000000000001) gain_m2=5.380 distance_m=3.200 turn_rad=0.455 revisit=0.000 score=1.205 selected=False
+t=4.03s state=MOVING mission=DISABLED front=1.20m pose=(+0.12, -0.03, -26.1deg) goal=(0.7000000000000001, -2.1) detections=0 located=0 targets=0 perception=WAIT_CALIBRATION
+t=5.06s exploration known_area_m2=6.050 frontier_groups=41 reachable_candidates=76 goal=(0.700,-2.100) odom_distance_m=0.169 reason=안전한 Frontier 후보 있음 selection_reason=유효한 현재 목표 유지 goal_reached=N/A planning_failures=N/A
+t=5.06s frontier_score cell=(105, 103) goal=(0.30000000000000004, 0.5) gain_m2=4.020 distance_m=0.700 turn_rad=0.585 revisit=0.000 score=1.441 selected=False
+t=5.06s frontier_score cell=(79, 107) goal=(0.7000000000000001, -2.1) gain_m2=5.080 distance_m=2.500 turn_rad=0.585 revisit=0.000 score=1.297 selected=True
+t=5.06s frontier_score cell=(80, 106) goal=(0.6000000000000001, -2.0) gain_m2=4.950 distance_m=2.500 turn_rad=0.585 revisit=0.000 score=1.241 selected=False
+t=5.06s frontier_score cell=(81, 106) goal=(0.6000000000000001, -1.9000000000000001) gain_m2=4.770 distance_m=2.400 turn_rad=0.585 revisit=0.000 score=1.197 selected=False
+t=5.06s frontier_score cell=(106, 130) goal=(3.0, 0.6000000000000001) gain_m2=5.620 distance_m=3.500 turn_rad=0.585 revisit=0.000 score=1.196 selected=False
+t=5.06s state=MOVING mission=DISABLED front=1.17m pose=(+0.16, -0.05, -33.5deg) goal=(0.7000000000000001, -2.1) detections=0 located=0 targets=0 perception=WAIT_CALIBRATION
+t=5.06s map_saved=C:\Users\woosu\OneDrive\Desktop\hkton\controllers\tb3_teleop\maps\map.png
+t=5.95s goal_change=(0.7000000000000001, -2.1)->(0.30000000000000004, 0.5) reason=호출자가 목표를 변경함
+t=6.02s goal_change=(0.30000000000000004, 0.5)->(0.6000000000000001, -2.1) reason=호출자가 목표를 변경함
+t=6.02s exploration known_area_m2=6.230 frontier_groups=38 reachable_candidates=73 goal=(0.600,-2.100) odom_distance_m=0.207 reason=안전한 Frontier 후보 있음 selection_reason=목표 무효 후 재선택 goal_reached=N/A planning_failures=N/A
+t=6.02s frontier_score cell=(79, 106) goal=(0.6000000000000001, -2.1) gain_m2=5.010 distance_m=2.600 turn_rad=0.680 revisit=0.000 score=1.225 selected=True
+t=6.02s frontier_score cell=(80, 106) goal=(0.6000000000000001, -2.0) gain_m2=4.870 distance_m=2.500 turn_rad=0.680 revisit=0.000 score=1.198 selected=False
+t=6.02s frontier_score cell=(106, 130) goal=(3.0, 0.6000000000000001) gain_m2=5.570 distance_m=3.500 turn_rad=0.680 revisit=0.000 score=1.166 selected=False
+t=6.02s frontier_score cell=(81, 106) goal=(0.6000000000000001, -1.9000000000000001) gain_m2=4.700 distance_m=2.400 turn_rad=0.680 revisit=0.000 score=1.158 selected=False
+t=6.02s frontier_score cell=(106, 129) goal=(2.9000000000000004, 0.6000000000000001) gain_m2=5.470 distance_m=3.400 turn_rad=0.680 revisit=0.000 score=1.156 selected=False
+t=6.02s state=MOVING mission=DISABLED front=1.14m pose=(+0.19, -0.07, -38.9deg) goal=(0.6000000000000001, -2.1) detections=0 located=0 targets=0 perception=WAIT_CALIBRATION
+t=7.04s exploration known_area_m2=6.390 frontier_groups=39 reachable_candidates=67 goal=(0.600,-2.100) odom_distance_m=0.248 reason=안전한 Frontier 후보 있음 selection_reason=유효한 현재 목표 유지 goal_reached=N/A planning_failures=N/A
+t=7.04s frontier_score cell=(79, 106) goal=(0.6000000000000001, -2.1) gain_m2=5.000 distance_m=2.600 turn_rad=0.700 revisit=0.000 score=1.219 selected=True
+t=7.04s frontier_score cell=(80, 106) goal=(0.6000000000000001, -2.0) gain_m2=4.840 distance_m=2.500 turn_rad=0.700 revisit=0.000 score=1.183 selected=False
+t=7.04s frontier_score cell=(81, 106) goal=(0.6000000000000001, -1.9000000000000001) gain_m2=4.670 distance_m=2.400 turn_rad=0.700 revisit=0.000 score=1.143 selected=False
+t=7.04s frontier_score cell=(106, 130) goal=(3.0, 0.6000000000000001) gain_m2=5.460 distance_m=3.500 turn_rad=0.700 revisit=0.000 score=1.117 selected=False
+t=7.04s frontier_score cell=(106, 129) goal=(2.9000000000000004, 0.6000000000000001) gain_m2=5.350 distance_m=3.400 turn_rad=0.700 revisit=0.000 score=1.103 selected=False
+t=7.04s state=MOVING mission=DISABLED front=1.10m pose=(+0.22, -0.10, -40.1deg) goal=(0.6000000000000001, -2.1) detections=0 located=0 targets=0 perception=WAIT_CALIBRATION
+t=8.00s exploration known_area_m2=6.520 frontier_groups=36 reachable_candidates=70 goal=(0.600,-2.100) odom_distance_m=0.286 reason=안전한 Frontier 후보 있음 selection_reason=유효한 현재 목표 유지 goal_reached=N/A planning_failures=N/A
+t=8.00s frontier_score cell=(79, 106) goal=(0.6000000000000001, -2.1) gain_m2=5.010 distance_m=2.600 turn_rad=0.774 revisit=0.000 score=1.216 selected=True
+t=8.00s frontier_score cell=(80, 106) goal=(0.6000000000000001, -2.0) gain_m2=4.850 distance_m=2.500 turn_rad=0.774 revisit=0.000 score=1.180 selected=False
+t=8.00s frontier_score cell=(81, 106) goal=(0.6000000000000001, -1.9000000000000001) gain_m2=4.670 distance_m=2.400 turn_rad=0.774 revisit=0.000 score=1.136 selected=False
+t=8.00s frontier_score cell=(82, 106) goal=(0.6000000000000001, -1.8) gain_m2=4.480 distance_m=2.300 turn_rad=0.774 revisit=0.000 score=1.088 selected=False
+t=8.00s frontier_score cell=(85, 102) goal=(0.2, -1.5) gain_m2=4.070 distance_m=1.800 turn_rad=0.774 revisit=0.000 score=1.078 selected=False
+t=8.00s state=MOVING mission=DISABLED front=1.06m pose=(+0.25, -0.13, -45.7deg) goal=(0.6000000000000001, -2.1) detections=0 located=0 targets=0 perception=WAIT_CALIBRATION
+t=9.02s exploration known_area_m2=6.720 frontier_groups=37 reachable_candidates=71 goal=(0.600,-2.100) odom_distance_m=0.368 reason=안전한 Frontier 후보 있음 selection_reason=유효한 현재 목표 유지 goal_reached=N/A planning_failures=N/A
+t=9.02s frontier_score cell=(78, 106) goal=(0.6000000000000001, -2.2) gain_m2=5.130 distance_m=2.500 turn_rad=0.676 revisit=0.000 score=1.310 selected=False
+t=9.02s frontier_score cell=(79, 106) goal=(0.6000000000000001, -2.1) gain_m2=4.980 distance_m=2.400 turn_rad=0.676 revisit=0.000 score=1.279 selected=True
+t=9.02s frontier_score cell=(80, 106) goal=(0.6000000000000001, -2.0) gain_m2=4.820 distance_m=2.300 turn_rad=0.676 revisit=0.000 score=1.243 selected=False
+t=9.02s frontier_score cell=(81, 106) goal=(0.6000000000000001, -1.9000000000000001) gain_m2=4.640 distance_m=2.200 turn_rad=0.676 revisit=0.000 score=1.199 selected=False
+t=9.02s frontier_score cell=(82, 106) goal=(0.6000000000000001, -1.8) gain_m2=4.450 distance_m=2.100 turn_rad=0.676 revisit=0.000 score=1.151 selected=False
+t=9.02s state=MOVING mission=DISABLED front=1.01m pose=(+0.28, -0.16, -51.3deg) goal=(0.6000000000000001, -2.1) detections=0 located=0 targets=0 perception=WAIT_CALIBRATION
+t=10.05s exploration known_area_m2=6.840 frontier_groups=39 reachable_candidates=69 goal=(0.600,-2.100) odom_distance_m=0.413 reason=안전한 Frontier 후보 있음 selection_reason=유효한 현재 목표 유지 goal_reached=N/A planning_failures=N/A
+t=10.05s frontier_score cell=(78, 106) goal=(0.6000000000000001, -2.2) gain_m2=5.100 distance_m=2.500 turn_rad=0.582 revisit=0.000 score=1.306 selected=False
+t=10.05s frontier_score cell=(79, 106) goal=(0.6000000000000001, -2.1) gain_m2=4.950 distance_m=2.400 turn_rad=0.582 revisit=0.000 score=1.275 selected=True
+t=10.05s frontier_score cell=(80, 106) goal=(0.6000000000000001, -2.0) gain_m2=4.790 distance_m=2.300 turn_rad=0.582 revisit=0.000 score=1.239 selected=False
+t=10.05s frontier_score cell=(81, 106) goal=(0.6000000000000001, -1.9000000000000001) gain_m2=4.610 distance_m=2.200 turn_rad=0.582 revisit=0.000 score=1.195 selected=False
+t=10.05s frontier_score cell=(82, 106) goal=(0.6000000000000001, -1.8) gain_m2=4.420 distance_m=2.100 turn_rad=0.582 revisit=0.000 score=1.147 selected=False
+t=10.05s state=MOVING mission=DISABLED front=1.03m pose=(+0.30, -0.19, -56.7deg) goal=(0.6000000000000001, -2.1) detections=0 located=0 targets=0 perception=WAIT_CALIBRATION
+t=10.05s map_saved=C:\Users\woosu\OneDrive\Desktop\hkton\controllers\tb3_teleop\maps\map.png
+t=11.01s exploration known_area_m2=6.890 frontier_groups=42 reachable_candidates=74 goal=(0.600,-2.100) odom_distance_m=0.512 reason=안전한 Frontier 후보 있음 selection_reason=유효한 현재 목표 유지 goal_reached=N/A planning_failures=N/A
+t=11.01s frontier_score cell=(78, 106) goal=(0.6000000000000001, -2.2) gain_m2=5.090 distance_m=2.500 turn_rad=0.498 revisit=0.000 score=1.310 selected=False
+t=11.01s frontier_score cell=(79, 106) goal=(0.6000000000000001, -2.1) gain_m2=4.940 distance_m=2.400 turn_rad=0.498 revisit=0.000 score=1.279 selected=True
+t=11.01s frontier_score cell=(106, 104) goal=(0.4, 0.6000000000000001) gain_m2=3.850 distance_m=0.900 turn_rad=1.073 revisit=0.000 score=1.255 selected=False
+t=11.01s frontier_score cell=(80, 106) goal=(0.6000000000000001, -2.0) gain_m2=4.780 distance_m=2.300 turn_rad=0.498 revisit=0.000 score=1.243 selected=False
+t=11.01s frontier_score cell=(81, 106) goal=(0.6000000000000001, -1.9000000000000001) gain_m2=4.600 distance_m=2.200 turn_rad=0.498 revisit=0.000 score=1.199 selected=False
+t=11.01s state=MOVING mission=DISABLED front=1.10m pose=(+0.33, -0.23, -61.5deg) goal=(0.6000000000000001, -2.1) detections=0 located=0 targets=0 perception=WAIT_CALIBRATION
+t=12.03s exploration known_area_m2=6.990 frontier_groups=39 reachable_candidates=72 goal=(0.600,-2.100) odom_distance_m=0.565 reason=안전한 Frontier 후보 있음 selection_reason=유효한 현재 목표 유지 goal_reached=N/A planning_failures=N/A
+t=12.03s frontier_score cell=(78, 106) goal=(0.6000000000000001, -2.2) gain_m2=5.080 distance_m=2.400 turn_rad=0.414 revisit=0.000 score=1.347 selected=False
+t=12.03s frontier_score cell=(79, 106) goal=(0.6000000000000001, -2.1) gain_m2=4.930 distance_m=2.300 turn_rad=0.414 revisit=0.000 score=1.316 selected=True
+t=12.03s frontier_score cell=(80, 106) goal=(0.6000000000000001, -2.0) gain_m2=4.770 distance_m=2.200 turn_rad=0.414 revisit=0.000 score=1.280 selected=False
+t=12.03s frontier_score cell=(81, 106) goal=(0.6000000000000001, -1.9000000000000001) gain_m2=4.590 distance_m=2.100 turn_rad=0.414 revisit=0.000 score=1.236 selected=False
+t=12.03s frontier_score cell=(106, 104) goal=(0.4, 0.6000000000000001) gain_m2=3.840 distance_m=1.000 turn_rad=1.157 revisit=0.000 score=1.209 selected=False
+t=12.03s state=MOVING mission=DISABLED front=1.71m pose=(+0.35, -0.28, -66.3deg) goal=(0.6000000000000001, -2.1) detections=2 located=0 targets=0 perception=WAIT_CALIBRATION
+t=13.06s exploration known_area_m2=7.160 frontier_groups=37 reachable_candidates=61 goal=(0.600,-2.100) odom_distance_m=0.675 reason=안전한 Frontier 후보 있음 selection_reason=유효한 현재 목표 유지 goal_reached=N/A planning_failures=N/A
+t=13.06s frontier_score cell=(78, 106) goal=(0.6000000000000001, -2.2) gain_m2=5.040 distance_m=2.300 turn_rad=0.336 revisit=0.000 score=1.371 selected=False
+t=13.06s frontier_score cell=(79, 106) goal=(0.6000000000000001, -2.1) gain_m2=4.890 distance_m=2.200 turn_rad=0.336 revisit=0.000 score=1.339 selected=True
+t=13.06s frontier_score cell=(80, 106) goal=(0.6000000000000001, -2.0) gain_m2=4.730 distance_m=2.100 turn_rad=0.336 revisit=0.000 score=1.304 selected=False
+t=13.06s frontier_score cell=(81, 106) goal=(0.6000000000000001, -1.9000000000000001) gain_m2=4.550 distance_m=2.000 turn_rad=0.336 revisit=0.000 score=1.260 selected=False
+t=13.06s frontier_score cell=(85, 101) goal=(0.1, -1.5) gain_m2=4.030 distance_m=1.500 turn_rad=0.336 revisit=0.000 score=1.202 selected=False
+t=13.06s state=MOVING mission=DISABLED front=1.40m pose=(+0.37, -0.33, -70.7deg) goal=(0.6000000000000001, -2.1) detections=3 located=0 targets=0 perception=WAIT_CALIBRATION
+t=14.02s exploration known_area_m2=7.400 frontier_groups=36 reachable_candidates=51 goal=(0.600,-2.100) odom_distance_m=0.737 reason=안전한 Frontier 후보 있음 selection_reason=유효한 현재 목표 유지 goal_reached=N/A planning_failures=N/A
+t=14.02s frontier_score cell=(78, 106) goal=(0.6000000000000001, -2.2) gain_m2=5.020 distance_m=2.200 turn_rad=0.272 revisit=0.000 score=1.401 selected=False
+t=14.02s frontier_score cell=(79, 106) goal=(0.6000000000000001, -2.1) gain_m2=4.870 distance_m=2.100 turn_rad=0.272 revisit=0.000 score=1.370 selected=True
+t=14.02s frontier_score cell=(80, 106) goal=(0.6000000000000001, -2.0) gain_m2=4.710 distance_m=2.000 turn_rad=0.272 revisit=0.000 score=1.335 selected=False
+t=14.02s frontier_score cell=(81, 106) goal=(0.6000000000000001, -1.9000000000000001) gain_m2=4.530 distance_m=1.900 turn_rad=0.272 revisit=0.000 score=1.290 selected=False
+t=14.02s frontier_score cell=(86, 101) goal=(0.1, -1.4000000000000001) gain_m2=3.820 distance_m=1.300 turn_rad=0.272 revisit=0.000 score=1.185 selected=False
+t=14.02s state=MOVING mission=DISABLED front=1.33m pose=(+0.39, -0.39, -74.4deg) goal=(0.6000000000000001, -2.1) detections=2 located=0 targets=0 perception=WAIT_CALIBRATION
+t=15.04s exploration known_area_m2=7.530 frontier_groups=36 reachable_candidates=54 goal=(0.600,-2.100) odom_distance_m=0.813 reason=안전한 Frontier 후보 있음 selection_reason=유효한 현재 목표 유지 goal_reached=N/A planning_failures=N/A
+t=15.04s frontier_score cell=(78, 107) goal=(0.7000000000000001, -2.2) gain_m2=5.050 distance_m=2.000 turn_rad=0.216 revisit=0.000 score=1.486 selected=False
+t=15.04s frontier_score cell=(78, 106) goal=(0.6000000000000001, -2.2) gain_m2=5.050 distance_m=2.100 turn_rad=0.216 revisit=0.000 score=1.453 selected=False
+t=15.04s frontier_score cell=(79, 106) goal=(0.6000000000000001, -2.1) gain_m2=4.900 distance_m=2.000 turn_rad=0.216 revisit=0.000 score=1.422 selected=True
+t=15.04s frontier_score cell=(80, 106) goal=(0.6000000000000001, -2.0) gain_m2=4.740 distance_m=1.900 turn_rad=0.216 revisit=0.000 score=1.386 selected=False
+t=15.04s frontier_score cell=(81, 106) goal=(0.6000000000000001, -1.9000000000000001) gain_m2=4.560 distance_m=1.800 turn_rad=0.216 revisit=0.000 score=1.342 selected=False
+t=15.04s state=MOVING mission=DISABLED front=1.26m pose=(+0.41, -0.47, -77.6deg) goal=(0.6000000000000001, -2.1) detections=2 located=0 targets=0 perception=WAIT_CALIBRATION
+t=15.04s map_saved=C:\Users\woosu\OneDrive\Desktop\hkton\controllers\tb3_teleop\maps\map.png
+t=16.00s exploration known_area_m2=7.630 frontier_groups=42 reachable_candidates=59 goal=(0.600,-2.100) odom_distance_m=0.896 reason=안전한 Frontier 후보 있음 selection_reason=유효한 현재 목표 유지 goal_reached=N/A planning_failures=N/A
+t=16.00s frontier_score cell=(78, 107) goal=(0.7000000000000001, -2.2) gain_m2=5.040 distance_m=2.000 turn_rad=0.177 revisit=0.000 score=1.486 selected=False
+t=16.00s frontier_score cell=(78, 106) goal=(0.6000000000000001, -2.2) gain_m2=5.040 distance_m=2.100 turn_rad=0.177 revisit=0.000 score=1.452 selected=False
+t=16.00s frontier_score cell=(78, 108) goal=(0.8, -2.2) gain_m2=5.040 distance_m=2.100 turn_rad=0.177 revisit=0.000 score=1.452 selected=False
+t=16.00s frontier_score cell=(79, 106) goal=(0.6000000000000001, -2.1) gain_m2=4.890 distance_m=2.000 turn_rad=0.177 revisit=0.000 score=1.421 selected=True
+t=16.00s frontier_score cell=(78, 109) goal=(0.9, -2.2) gain_m2=5.040 distance_m=2.200 turn_rad=0.177 revisit=0.000 score=1.419 selected=False
+t=16.00s state=MOVING mission=DISABLED front=1.17m pose=(+0.42, -0.55, -79.8deg) goal=(0.6000000000000001, -2.1) detections=2 located=0 targets=0 perception=WAIT_CALIBRATION
+t=17.02s exploration known_area_m2=7.750 frontier_groups=39 reachable_candidates=59 goal=(0.600,-2.100) odom_distance_m=1.035 reason=안전한 Frontier 후보 있음 selection_reason=유효한 현재 목표 유지 goal_reached=N/A planning_failures=N/A
+t=17.02s frontier_score cell=(78, 107) goal=(0.7000000000000001, -2.2) gain_m2=4.990 distance_m=1.800 turn_rad=0.155 revisit=0.000 score=1.533 selected=False
+t=17.02s frontier_score cell=(78, 106) goal=(0.6000000000000001, -2.2) gain_m2=4.990 distance_m=1.900 turn_rad=0.155 revisit=0.000 score=1.500 selected=False
+t=17.02s frontier_score cell=(78, 108) goal=(0.8, -2.2) gain_m2=4.990 distance_m=1.900 turn_rad=0.155 revisit=0.000 score=1.500 selected=False
+t=17.02s frontier_score cell=(79, 106) goal=(0.6000000000000001, -2.1) gain_m2=4.840 distance_m=1.800 turn_rad=0.155 revisit=0.000 score=1.468 selected=True
+t=17.02s frontier_score cell=(78, 109) goal=(0.9, -2.2) gain_m2=4.990 distance_m=2.000 turn_rad=0.155 revisit=0.000 score=1.466 selected=False
+t=17.02s state=MOVING mission=DISABLED front=1.07m pose=(+0.44, -0.65, -81.1deg) goal=(0.6000000000000001, -2.1) detections=2 located=0 targets=0 perception=WAIT_CALIBRATION
+t=18.05s exploration known_area_m2=7.900 frontier_groups=39 reachable_candidates=49 goal=(0.600,-2.100) odom_distance_m=1.152 reason=안전한 Frontier 후보 있음 selection_reason=유효한 현재 목표 유지 goal_reached=N/A planning_failures=N/A
+t=18.05s frontier_score cell=(78, 106) goal=(0.6000000000000001, -2.2) gain_m2=4.890 distance_m=1.700 turn_rad=0.157 revisit=0.000 score=1.523 selected=False
+t=18.05s frontier_score cell=(79, 106) goal=(0.6000000000000001, -2.1) gain_m2=4.740 distance_m=1.600 turn_rad=0.157 revisit=0.000 score=1.492 selected=True
+t=18.05s frontier_score cell=(80, 106) goal=(0.6000000000000001, -2.0) gain_m2=4.570 distance_m=1.500 turn_rad=0.157 revisit=0.000 score=1.452 selected=False
+t=18.05s frontier_score cell=(81, 106) goal=(0.6000000000000001, -1.9000000000000001) gain_m2=4.380 distance_m=1.400 turn_rad=0.157 revisit=0.000 score=1.404 selected=False
+t=18.05s frontier_score cell=(86, 99) goal=(-0.1, -1.4000000000000001) gain_m2=4.040 distance_m=1.200 turn_rad=0.157 revisit=0.000 score=1.324 selected=False
+t=18.05s state=MOVING mission=DISABLED front=0.95m pose=(+0.46, -0.77, -81.0deg) goal=(0.6000000000000001, -2.1) detections=2 located=0 targets=0 perception=WAIT_CALIBRATION
+t=19.01s exploration known_area_m2=8.030 frontier_groups=37 reachable_candidates=48 goal=(0.600,-2.100) odom_distance_m=1.295 reason=안전한 Frontier 후보 있음 selection_reason=유효한 현재 목표 유지 goal_reached=N/A planning_failures=N/A
+t=19.01s frontier_score cell=(78, 106) goal=(0.6000000000000001, -2.2) gain_m2=4.800 distance_m=1.600 turn_rad=0.171 revisit=0.000 score=1.516 selected=False
+t=19.01s frontier_score cell=(79, 106) goal=(0.6000000000000001, -2.1) gain_m2=4.650 distance_m=1.500 turn_rad=0.171 revisit=0.000 score=1.485 selected=True
+t=19.01s frontier_score cell=(80, 106) goal=(0.6000000000000001, -2.0) gain_m2=4.470 distance_m=1.400 turn_rad=0.171 revisit=0.000 score=1.441 selected=False
+t=19.01s frontier_score cell=(81, 106) goal=(0.6000000000000001, -1.9000000000000001) gain_m2=4.280 distance_m=1.300 turn_rad=0.171 revisit=0.000 score=1.392 selected=False
+t=19.01s frontier_score cell=(86, 100) goal=(0.0, -1.4000000000000001) gain_m2=3.780 distance_m=1.000 turn_rad=0.171 revisit=0.000 score=1.277 selected=False
+t=19.01s state=MOVING mission=DISABLED front=0.85m pose=(+0.48, -0.87, -80.2deg) goal=(0.6000000000000001, -2.1) detections=2 located=0 targets=0 perception=WAIT_CALIBRATION
