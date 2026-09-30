@@ -439,7 +439,6 @@ def _recovery_command(ranges, linear_ref, angular_ref, front_distance):
     global _recovery_turn_sign
     global _avoidance_active
     global _last_turn_sign
-    global _recovery_active
 
     # Exit recovery only after the normal path is safe again and the front
     # has opened by a comfortable margin.
@@ -587,6 +586,15 @@ def _select_local_command(
         angular_ref,
         front_distance,
     ):
+
+        # A complete stop is not a valid MOVING avoidance command.
+        # If every actually moving candidate is unsafe, let ``best`` remain
+        # None so that the committed corner-recovery turn can take over.
+        if (
+            abs(linear) < 1e-9
+            and abs(angular) < 1e-9
+        ):
+            continue
 
         # If something is clearly in front,
         # do not keep creeping nearly straight toward it.
