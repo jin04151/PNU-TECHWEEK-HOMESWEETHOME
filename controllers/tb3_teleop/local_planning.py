@@ -814,19 +814,37 @@ def command(
 
     (
         linear_ref,
-        angular_ref,
+    angular_ref,
         _,
     ) = _pure_pursuit_reference(
         pose,
         path,
     )
 
+# ------------------------------------------------------------
+# Pure Pursuit가 goal이 아직 먼데도 (0, 0)을 반환하는 경우
+# path tracking 상태를 다시 잡고 reference를 재계산한다.
+# ------------------------------------------------------------
+    if (
+        abs(linear_ref) < 1e-9
+        and abs(angular_ref) < 1e-9
+    ):
+        _reset_tracking()
+
+        (
+            linear_ref,
+            angular_ref,
+            _,
+        ) = _pure_pursuit_reference(
+            pose,
+            path,
+        )
+
     front_distance = (
         nearest_front_obstacle(
             ranges
         )
     )
-
     # ------------------------------------------------------------
     # 3. Slow down before the obstacle becomes close enough to
     #    require active avoidance.
