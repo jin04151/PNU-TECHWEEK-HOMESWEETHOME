@@ -7,7 +7,6 @@ rescue_goal_reached는 구출 수 충족이며 시작점 복귀 완료를 뜻하
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -25,7 +24,7 @@ class Detection:
     """검출 결과. bbox는 왼쪽 위 원점의 (x_min, y_min, x_max, y_max) 픽셀 좌표.
 
     x는 오른쪽, y는 아래쪽으로 증가하며 최대 경계는 포함하지 않는다.
-    confidence는 0~1의 신뢰도이며 점수를 제공하지 않는 검출기는 None을 쓴다.
+    confidence는 0~1의 후보 점수이며 확률이 아니다. 점수가 없으면 None을 쓴다.
     """
 
     label: str
@@ -57,142 +56,91 @@ def camera_image_to_bgr(data: bytes | bytearray | memoryview | None,
     return pixels.reshape(height, width, 4)[:, :, :3].copy()
 
 
-COCO_APPLE_CLASS = 47
-DEFAULT_WEIGHTS = Path(__file__).resolve().parents[2] / 'models' / 'YOLO' / 'yolo11n.pt'
-
-# uint8 HSV 초기 범위. 실제 Webots 조명/거리에서 조정해야 한다.
-# 빨강은 hue의 양 끝을 합친다. 파랑 등 판별 대상 밖의 색은 unknown으로 둔다.
+# OpenCV uint8 HSV: H=0..179. 실제 Webots 조명/거리에서 조정한다.
+# 빨강은 Hue 양 끝에 걸치므로 두 범위를 합친다.
 HSV_RANGES = {
     'red': (((0, 70, 40), (10, 255, 255)),
             ((170, 70, 40), (179, 255, 255))),
-    'orange': (((11, 70, 40), (35, 255, 255)),),
-    'green': (((36, 60, 35), (89, 255, 255)),),
-    'purple': (((125, 60, 35), (169, 255, 255)),),
 }
 
 
 @dataclass(frozen=True)
 class ColorConfig:
-    """ROI 내 색상 외곽선의 초기 판별 기준. 현장 보정이 필요한 값이다."""
-    min_area_px: float = 8.0
-    min_fraction: float = 0.10
-    min_circularity: float = 0.20
-    dominance_ratio: float = 1.30
+    """전체 영상의 빨간색 후보 필터. 면적 단위는 픽셀 제곱이다."""
+    min_area_px: float = 20.0
+    min_fraction: float = 0.35
+    min_circularity: float = 0.30
+    min_aspect_ratio: float = 0.40
+    max_aspect_ratio: float = 2.50
 
     def __post_init__(self):
-        values = (self.min_area_px, self.min_fraction,
-                  self.min_circularity, self.dominance_ratio)
+        values = (self.min_area_px, self.min_fraction, self.min_circularity,
+                  self.min_aspect_ratio, self.max_aspect_ratio)
         if (not np.isfinite(values).all() or self.min_area_px <= 0
                 or not 0 < self.min_fraction <= 1
                 or not 0 <= self.min_circularity <= 1
-                or self.dominance_ratio <= 1):
-            raise ValueError('유효한 색상 면적·비율·원형도·우세 비율이 필요합니다.')
-
-
-def _classify_color(roi, config):
-    """BGR ROI에서 색상, ROI 기준 무게중심, 외접원 반지름, 면적 비율 반환."""
-    import cv2
-
-    blurred = cv2.GaussianBlur(roi, (3, 3), 0)
-    hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    candidates = []
-    roi_area = roi.shape[0] * roi.shape[1]
-    for color, intervals in HSV_RANGES.items():
-        mask = np.zeros(roi.shape[:2], dtype=np.uint8)
-        for lower, upper in intervals:
-            mask |= cv2.inRange(hsv, np.array(lower, dtype=np.uint8),
-                               np.array(upper, dtype=np.uint8))
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
-                                      cv2.CHAIN_APPROX_SIMPLE)
-        # 한 YOLO 상자 안의 대표 외곽선만 선택한다. 다른 YOLO 상자는 별도 처리.
-        for contour in contours:
-            area = cv2.contourArea(contour)
-            perimeter = cv2.arcLength(contour, True)
-            if (area < config.min_area_px or area / roi_area < config.min_fraction
-                    or perimeter <= 0
-                    or 4 * np.pi * area / perimeter ** 2 < config.min_circularity):
-                continue
-            moments = cv2.moments(contour)
-            if moments['m00'] <= 0:
-                continue
-            center = (moments['m10'] / moments['m00'],
-                      moments['m01'] / moments['m00'])
-            _, radius = cv2.minEnclosingCircle(contour)
-            candidates.append((area, color, center, float(radius)))
-    if not candidates:
-        return 'unknown_color', None, None, None
-    candidates.sort(key=lambda item: item[0], reverse=True)
-    area, color, center, radius = candidates[0]
-    other_area = max((item[0] for item in candidates if item[1] != color), default=0)
-    if other_area and area < other_area * config.dominance_ratio:
-        return 'unknown_color', None, None, None
-    return color, center, radius, area / roi_area
+                or not 0 < self.min_aspect_ratio <= self.max_aspect_ratio):
+            raise ValueError('유효한 면적·색상 비율·원형도·가로세로 비율이 필요합니다.')
 
 
 class AppleDetector:
-    """YOLO11n COCO 사과 검출 → bbox별 HSV 색상/외곽선 분석.
+    """OpenCV HSV 마스크와 외곽선으로 빨간 사과 후보를 검출한다.
 
-    모델은 첫 검출 때 한 번 로드한다. 기본 가중치는 저장소의
-    models/YOLO/yolo11n.pt이며 없으면 Ultralytics가 최초 실행 때 다운로드한다.
-    최초 다운로드에는 인터넷 연결이 필요하며 이후에는 저장된 파일을 재사용한다.
-    model 인자는 이미 로드한 Ultralytics 모델을 전달할 때 사용한다.
-    confidence는 YOLO 점수이고 color_fraction은 ROI 내 색상 면적 비율이다.
+    색상/형태 기반이므로 다른 빨간 물체도 후보가 될 수 있다.
+    confidence는 색상 비율과 원형도의 평균 점수이며 학습 모델의 확률이 아니다.
+    붙어 있는 빨간 영역은 하나의 외곽선으로 검출될 수 있다.
     """
 
-    def __init__(self, weights=DEFAULT_WEIGHTS, *, conf=0.25, iou=0.5,
-                 device='cpu', color_config=None, model=None):
-        if not np.isfinite([conf, iou]).all() or not (0 < conf <= 1 and 0 < iou <= 1):
-            raise ValueError('conf와 iou는 0 초과 1 이하이어야 합니다.')
-        self.weights = Path(weights).expanduser().resolve()
-        self.conf = float(conf)
-        self.iou = float(iou)
-        self.device = device
+    def __init__(self, *, color_config=None):
         self.color_config = color_config or ColorConfig()
-        self._model = model
-
-    def _get_model(self):
-        if self._model is None:
-            from ultralytics import YOLO
-            if not self.weights.is_file():
-                self.weights.parent.mkdir(parents=True, exist_ok=True)
-                print(f'YOLO 가중치를 다운로드합니다: {self.weights}', flush=True)
-            self._model = YOLO(str(self.weights))
-        return self._model
 
     def detect(self, image: np.ndarray) -> list[Detection]:
-        """uint8 BGR 영상에서 모든 사과 후보를 반환한다. 미검출은 빈 목록."""
+        """uint8 BGR 전체 영상에서 모든 유효 후보를 반환한다. 미검출은 []."""
+        import cv2
+
         if (not isinstance(image, np.ndarray) or image.dtype != np.uint8
                 or image.ndim != 3 or image.shape[2] != 3
                 or image.shape[0] == 0 or image.shape[1] == 0):
             raise ValueError('높이와 폭이 양수인 uint8 BGR (H,W,3) 영상이 필요합니다.')
-        results = self._get_model().predict(
-            source=np.ascontiguousarray(image), classes=[COCO_APPLE_CLASS],
-            conf=self.conf, iou=self.iou, device=self.device, verbose=False)
+        config = self.color_config
+        blurred = cv2.GaussianBlur(image, (3, 3), 0)
+        hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
+        red_mask = np.zeros(image.shape[:2], dtype=np.uint8)
+        for lower, upper in HSV_RANGES['red']:
+            red_mask |= cv2.inRange(hsv, np.array(lower, dtype=np.uint8),
+                                   np.array(upper, dtype=np.uint8))
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
+                                      cv2.CHAIN_APPROX_SIMPLE)
         detections = []
-        height, width = image.shape[:2]
-        for result in results:
-            if result.boxes is None:
+        for contour in contours:
+            area = cv2.contourArea(contour)
+            perimeter = cv2.arcLength(contour, True)
+            if area < config.min_area_px or perimeter <= 0:
                 continue
-            boxes = result.boxes.cpu().numpy()
-            for xyxy, confidence, class_id in zip(
-                    boxes.xyxy, boxes.conf, boxes.cls):
-                if (not np.isfinite(xyxy).all() or not np.isfinite(confidence)
-                        or class_id != COCO_APPLE_CLASS or confidence < self.conf):
-                    continue
-                x0, y0 = np.floor(np.clip(xyxy[:2], [0, 0], [width, height])).astype(int)
-                x1, y1 = np.ceil(np.clip(xyxy[2:], [0, 0], [width, height])).astype(int)
-                if x1 <= x0 or y1 <= y0:
-                    continue
-                color, center, radius, fraction = _classify_color(
-                    image[y0:y1, x0:x1], self.color_config)
-                centroid = None if center is None else (center[0] + x0, center[1] + y0)
-                label = 'apple_unknown_color' if color == 'unknown_color' else f'{color}_apple'
-                detections.append(Detection(
-                    label, (int(x0), int(y0), int(x1), int(y1)), float(confidence),
-                    centroid, radius, fraction))
+            circularity = float(np.clip(4 * np.pi * area / perimeter ** 2, 0, 1))
+            x, y, width, height = cv2.boundingRect(contour)
+            aspect = width / height
+            # closing으로 채운 픽셀 대신 원래 HSV 마스크의 빨간색 픽셀 비율을 쓴다.
+            fraction = cv2.countNonZero(red_mask[y:y + height, x:x + width]) / (width * height)
+            if (circularity < config.min_circularity
+                    or fraction < config.min_fraction
+                    or not config.min_aspect_ratio <= aspect <= config.max_aspect_ratio):
+                continue
+            moments = cv2.moments(contour)
+            if moments['m00'] <= 0:
+                continue
+            centroid = (float(moments['m10'] / moments['m00']),
+                        float(moments['m01'] / moments['m00']))
+            _, radius = cv2.minEnclosingCircle(contour)
+            score = float((fraction + circularity) / 2)
+            detections.append(Detection(
+                TARGET_LABEL, (x, y, x + width, y + height), score,
+                centroid, float(radius), float(fraction)))
+        # 프레임 내 순서를 고정할 뿐 ID는 아니다. 고유 ID는 TargetRegistry가 관리한다.
+        detections.sort(key=lambda detection: detection.bbox[:2])
         return detections
 
 
@@ -202,7 +150,7 @@ _default_detector = None
 def detect_targets(image: np.ndarray, *, detector=None) -> list[Detection]:
     """빨간 사과 후보만 반환한다. 두 개가 보여도 구출 완료로 간주하지 않는다.
 
-    전체 색상 진단은 AppleDetector.detect()를 사용한다.
+    HSV 색상과 형태를 이용한 후보이며 사과 종류를 학습한 분류 결과는 아니다.
     반환 개수는 2개로 자르지 않는다. 고유 목표와 완료 수는 Registry가 관리한다.
     """
     global _default_detector
