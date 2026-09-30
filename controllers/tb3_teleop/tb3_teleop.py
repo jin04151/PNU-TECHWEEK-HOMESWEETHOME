@@ -19,7 +19,7 @@ from global_costmap import (
 
 from localization import Localization, Pose
 from mapping import OccupancyGrid
-from mission_manager import MissionManager
+#from mission_manager import MissionManager
 
 
 # ------------------------------------------------------------
