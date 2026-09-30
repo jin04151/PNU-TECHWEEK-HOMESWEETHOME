@@ -23,9 +23,6 @@ GYRO_BIAS_WALK_STD = 0.00001
 ENCODER_V_STD = 0.02
 ENCODER_OMEGA_STD = 5.0
 GYRO_OMEGA_STD = 0.002
-COMPASS_THETA_STD = 0.05
-COMPASS_ADAPT_ALPHA = 0.01
-COMPASS_MIN_THETA_STD = 0.005
 SCAN_MATCH_XY_STD = 0.03
 SCAN_MATCH_THETA_STD = 0.02
 
@@ -40,10 +37,6 @@ ZUPT_OMEGA_STD = 0.002
 INITIAL_STD = np.array([0.05, 0.05, 0.05, 0.05, 0.05, 0.05])
 
 STATIONARY_DISTANCE = 1e-4
-
-COMPASS_MIN_NORM = 1e-3
-CALIBRATION_TURN_RAD = 0.6
-CALIBRATION_MAX_SAMPLES = 400
 
 MAX_DT = 1.0
 
@@ -77,18 +70,8 @@ class Localization:
 
         self.gyro = (0.0, 0.0, 0.0)
         self.acceleration = (0.0, 0.0, 0.0)
-        self.compass = (0.0, 0.0, 0.0)
 
         self.stationary = False
-
-        self.compass_sign = None
-        self.compass_offset = 0.0
-        self.compass_heading = None
-        self.compass_variance = COMPASS_THETA_STD ** 2
-        self._calibration_samples = []
-        self._calibration_previous_raw = None
-        self._calibration_turn = 0.0
-        self._calibration_correlation = 0.0
 
         self.scan_match_count = 0
         self.landmark_count = 0
@@ -101,11 +84,10 @@ class Localization:
         if math.isfinite(linear) and math.isfinite(angular):
             self.command = (float(linear), float(angular))
 
-    def update(self, left_angle, right_angle, gyro, acceleration, compass, now,
+    def update(self, left_angle, right_angle, gyro, acceleration, _unused, now,
                command=None):
         self.gyro = _as_triple(gyro)
         self.acceleration = _as_triple(acceleration)
-        self.compass = _as_triple(compass)
         if command is not None:
             self.set_command(command[0], command[1])
 
@@ -148,8 +130,6 @@ class Localization:
         self._update_accelerometer(moving)
 
         self._integrate_pose(dt)
-
-        self._update_compass(dt)
 
         self.travelled += abs(0.5 * (left_distance + right_distance))
         return self._sync_pose()
@@ -256,12 +236,7 @@ class Localization:
                 math.sqrt(diagonal[THETA]))
 
     def calibration_state(self):
-        if self.compass_sign is None:
-            progress = min(1.0, self._calibration_turn / CALIBRATION_TURN_RAD)
-            return f'compass=calibrating({progress * 100:.0f}%)'
-        return (f'compass=sign{self.compass_sign:+.0f} '
-                f'offset={math.degrees(self.compass_offset):+.1f}deg '
-                f'gyro_bias={self.gyro_bias:+.4f}rad/s')
+        return f'gyro_bias={self.gyro_bias:+.4f}rad/s'
 
     def _predict_velocity(self, dt):
         tracking = COMMAND_TRACKING if self.command is not None else 0.0
@@ -372,66 +347,6 @@ class Localization:
         self._apply_update(np.array([residual]), jacobian,
                            np.array([[ACCEL_LATERAL_STD ** 2]]))
         self.accel_count += 1
-
-    def _update_compass(self, dt):
-        raw = self._compass_angle()
-        if raw is None:
-            return
-
-        if self.compass_sign is None:
-            self._calibrate(raw, self.state[OMEGA] * dt)
-            return
-
-        heading = wrap_angle(self.compass_sign * raw + self.compass_offset)
-        self.compass_heading = heading
-
-        innovation = wrap_angle(heading - self.state[THETA])
-        self.compass_variance += COMPASS_ADAPT_ALPHA * (
-            innovation * innovation - self.compass_variance)
-        noise = max(COMPASS_MIN_THETA_STD ** 2,
-                    self.compass_variance - self.covariance[THETA, THETA])
-
-        self._update_linear(
-            np.array([heading]),
-            _rows(THETA),
-            np.array([[noise]]),
-            angle_rows=(0,))
-
-    def _compass_angle(self):
-        cx, cy = self.compass[0], self.compass[1]
-        if not (math.isfinite(cx) and math.isfinite(cy)):
-            return None
-        if math.hypot(cx, cy) < COMPASS_MIN_NORM:
-            return None
-        return math.atan2(cx, cy)
-
-    def _calibrate(self, raw, turn):
-        self._calibration_samples.append((raw, self.state[THETA]))
-        if len(self._calibration_samples) > CALIBRATION_MAX_SAMPLES:
-            self._calibration_samples.pop(0)
-
-        if self._calibration_previous_raw is not None and turn != 0.0:
-            delta = wrap_angle(raw - self._calibration_previous_raw)
-            self._calibration_correlation += turn * delta
-            self._calibration_turn += abs(turn)
-        self._calibration_previous_raw = raw
-
-        if self._calibration_turn < CALIBRATION_TURN_RAD:
-            return
-        if self._calibration_correlation == 0.0:
-            return
-
-        sign = 1.0 if self._calibration_correlation > 0.0 else -1.0
-        sin_sum = 0.0
-        cos_sum = 0.0
-        for sample_raw, sample_theta in self._calibration_samples:
-            difference = wrap_angle(sample_theta - sign * sample_raw)
-            sin_sum += math.sin(difference)
-            cos_sum += math.cos(difference)
-
-        self.compass_sign = sign
-        self.compass_offset = math.atan2(sin_sum, cos_sum)
-        self._calibration_samples.clear()
 
     def _sync_pose(self):
         self.pose.x = float(self.state[X])
