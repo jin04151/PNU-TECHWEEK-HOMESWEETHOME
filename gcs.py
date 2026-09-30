@@ -19,37 +19,62 @@ import time
 import zlib
 from pathlib import Path
 
-import numpy as np
-from PyQt6.QtCore import QPointF, QProcess, QProcessEnvironment, QRectF, Qt, QTimer
-from PyQt6.QtGui import QAction, QColor, QFont, QImage, QPainter, QPainterPath, QPalette, QPen
-from PyQt6.QtNetwork import QHostAddress, QUdpSocket
-from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout,
-                             QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-                             QMainWindow, QPlainTextEdit, QPushButton, QSplitter,
-                             QVBoxLayout, QWidget)
+try:
+    import numpy as np
+    from PyQt6.QtCore import QPointF, QProcess, QProcessEnvironment, QRectF, Qt, QTimer
+    from PyQt6.QtGui import QAction, QColor, QFont, QImage, QPainter, QPainterPath, QPalette, QPen
+    from PyQt6.QtNetwork import QHostAddress, QUdpSocket
+    from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout,
+                                 QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+                                 QMainWindow, QPlainTextEdit, QPushButton, QSplitter,
+                                 QVBoxLayout, QWidget)
+except ImportError as error:
+    sys.exit(f'[GCS] 필요한 패키지가 없습니다: {error.name}\n'
+             f'  지금 쓰는 파이썬: {sys.executable}\n'
+             f'  설치: "{sys.executable}" -m pip install PyQt6 numpy')
 
 
 HERE = Path(__file__).resolve().parent
 PORT = int(os.environ.get('AMR_GCS_PORT', '5600'))
 DEFAULT_WORLD = 'worlds/apartment.wbt'      # gcs.py 위치 기준
+SETTINGS_PATH = HERE / 'gcs_settings.json'  # PC 마다 다른 값(Webots 위치). git 에 올리지 않는다
 
 
-def find_webots():
-    """WEBOTS_HOME → PATH 의 webots → OS 기본 설치 위치 순서로 찾는다."""
+def load_settings():
+    try:
+        return json.loads(SETTINGS_PATH.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return {}
+
+
+def save_settings(**values):
+    settings = load_settings()
+    settings.update(values)
+    try:
+        SETTINGS_PATH.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding='utf-8')
+    except OSError:
+        pass
+
+
+def find_webots(explicit=None):
+    """--webots → 저장된 위치 → WEBOTS_HOME → PATH → 흔한 설치 위치 순서로 찾는다."""
     import shutil
-    home = os.environ.get('WEBOTS_HOME')
     candidates = []
-    if home:
-        candidates += [Path(home) / 'msys64/mingw64/bin/webots.exe', Path(home) / 'webots']
+    for given in (explicit, load_settings().get('webots'), os.environ.get('WEBOTS_HOME')):
+        if given:
+            given = Path(given)
+            candidates += [given, given / 'msys64/mingw64/bin/webots.exe', given / 'webots']
     found = shutil.which('webots')
     if found:
         candidates.append(Path(found))
     if sys.platform == 'win32':
-        candidates.append(Path(os.environ.get('LOCALAPPDATA', '')) / 'Programs/Webots/msys64/mingw64/bin/webots.exe')
-        candidates.append(Path(os.environ.get('ProgramFiles', 'C:/Program Files')) / 'Webots/msys64/mingw64/bin/webots.exe')
+        roots = [Path(os.environ.get('LOCALAPPDATA', '')) / 'Programs',
+                 Path(os.environ.get('ProgramFiles', 'C:/Program Files'))]
+        roots += [Path(f'{drive}:/') / sub for drive in 'CDEF' for sub in ('Program Files', '')]
+        candidates += [root / 'Webots/msys64/mingw64/bin/webots.exe' for root in roots]
     else:
         candidates += [Path('/usr/local/webots/webots'), Path('/snap/bin/webots'), Path.home() / 'webots/webots']
-    return next((path for path in candidates if path.exists()), None)
+    return next((path for path in candidates if path.is_file()), None)
 
 
 def resolve(path_text):
@@ -473,9 +498,18 @@ class GCS(QMainWindow):
         if not world.exists():
             self.log(f'[GCS] 월드 파일이 없습니다: {world}')
             return
+        global WEBOTS
         if WEBOTS is None:
-            self.log('[GCS] Webots 를 찾을 수 없습니다. 환경변수 WEBOTS_HOME 을 설치 폴더로 지정하세요.')
-            return
+            self.log('[GCS] Webots 를 자동으로 찾지 못했습니다. webots 실행 파일을 골라 주세요.')
+            path, _ = QFileDialog.getOpenFileName(
+                self, 'Webots 실행 파일 선택 (예: ...\\Webots\\msys64\\mingw64\\bin\\webots.exe)',
+                str(Path.home()), 'Webots (webots.exe webots);;모든 파일 (*)')
+            if not path:
+                self.log('[GCS] 취소했습니다. --webots 경로 로도 지정할 수 있습니다.')
+                return
+            WEBOTS = Path(path)
+            save_settings(webots=str(WEBOTS))
+            self.log(f'[GCS] Webots 위치를 기억합니다: {WEBOTS} ({SETTINGS_PATH.name})')
         env = QProcessEnvironment.systemEnvironment()
         for name in ('QT_QPA_PLATFORM', 'QT_PLUGIN_PATH', 'QT_QPA_PLATFORM_PLUGIN_PATH'):
             env.remove(name)          # Webots 도 Qt 앱이라 이 창의 설정을 물려받으면 안 뜬다
@@ -558,10 +592,18 @@ def main():
     parser.add_argument('--run', action='store_true', help='창을 띄우자마자 Webots 실행')
     parser.add_argument('--world', default=str(DEFAULT_WORLD))
     parser.add_argument('--fast', action='store_true', help='Webots 화면 없이 고속')
+    parser.add_argument('--webots', help='webots 실행 파일 또는 설치 폴더 (한 번 주면 기억한다)')
     args = parser.parse_args()
+    global WEBOTS
+    if args.webots:
+        WEBOTS = find_webots(args.webots)
+        if WEBOTS is not None:
+            save_settings(webots=str(WEBOTS))
     app = QApplication(sys.argv[:1])
     dark(app)
     window = GCS(args.world)
+    window.log(f'[GCS] 파이썬: {sys.executable}')
+    window.log(f'[GCS] Webots: {WEBOTS or "찾지 못함 — 실행을 누르면 고를 수 있습니다"}')
     window.mode_combo.setCurrentIndex(1 if args.fast else 0)
     window.show()
     if args.run:
