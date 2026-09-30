@@ -6,3 +6,4 @@ controllers/*/maps/
 gcs_logs/
 worlds/.*.wbproj
 gcs_settings.json
+gcs_target.json

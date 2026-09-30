@@ -36,6 +36,30 @@ except ImportError as error:
 
 HERE = Path(__file__).resolve().parent
 PORT = int(os.environ.get('AMR_GCS_PORT', '5600'))
+# WSL 에서 GCS 를 돌리고 Windows 에 설치된 Webots 를 띄우는 경우를 지원한다.
+IS_WSL = sys.platform.startswith('linux') and 'microsoft' in os.uname().release.lower()
+
+
+def is_windows_exe(path):
+    return path is not None and str(path).lower().endswith('.exe')
+
+
+def to_webots_path(path):
+    """Windows 용 Webots 에 넘길 경로. WSL 경로(/home/...)는 \\\\wsl.localhost\\... 로 바꾼다."""
+    if IS_WSL and is_windows_exe(WEBOTS):
+        import subprocess
+        result = subprocess.run(['wslpath', '-w', str(path)], capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    return str(path)
+
+
+def wsl_ip():
+    """Windows 쪽에서 이 WSL 로 UDP 를 보낼 주소."""
+    import subprocess
+    result = subprocess.run(['hostname', '-I'], capture_output=True, text=True)
+    addresses = result.stdout.split()
+    return addresses[0] if addresses else '127.0.0.1'
 DEFAULT_WORLD = 'worlds/apartment.wbt'      # gcs.py 위치 기준
 SETTINGS_PATH = HERE / 'gcs_settings.json'  # PC 마다 다른 값(Webots 위치). git 에 올리지 않는다
 
@@ -74,6 +98,11 @@ def find_webots(explicit=None):
         candidates += [root / 'Webots/msys64/mingw64/bin/webots.exe' for root in roots]
     else:
         candidates += [Path('/usr/local/webots/webots'), Path('/snap/bin/webots'), Path.home() / 'webots/webots']
+        if IS_WSL:   # Windows 에 설치된 Webots
+            for drive in 'cdef':
+                base = Path(f'/mnt/{drive}')
+                candidates += sorted(base.glob('Users/*/AppData/Local/Programs/Webots/msys64/mingw64/bin/webots.exe'))
+                candidates += [base / sub / 'Webots/msys64/mingw64/bin/webots.exe' for sub in ('Program Files', '')]
     return next((path for path in candidates if path.is_file()), None)
 
 
@@ -311,7 +340,9 @@ class GCS(QMainWindow):
         self.log(f'[GCS] 로그 파일: {self.log_path}')
 
         self.socket = QUdpSocket(self)
-        if not self.socket.bind(QHostAddress.SpecialAddress.LocalHost, PORT):
+        # WSL 에서는 Windows 쪽 Webots 가 WSL IP 로 보내므로 모든 주소에서 받는다.
+        listen = QHostAddress.SpecialAddress.AnyIPv4 if IS_WSL else QHostAddress.SpecialAddress.LocalHost
+        if not self.socket.bind(listen, PORT):
             self._set_issue(f'UDP {PORT} 포트를 다른 프로그램이 쓰는 중 (GCS 가 이미 켜져 있나요?)')
         self.socket.readyRead.connect(self._receive)
         self.timer = QTimer(self)
@@ -515,10 +546,19 @@ class GCS(QMainWindow):
             env.remove(name)          # Webots 도 Qt 앱이라 이 창의 설정을 물려받으면 안 뜬다
         env.insert('PYTHONIOENCODING', 'utf-8')
         env.insert('AMR_GCS_PORT', str(PORT))
+        # 컨트롤러(mapping.py)가 보낼 주소를 저장소 폴더에 적어 둔다. 환경변수는 WSL → Windows
+        # 로 안 넘어가는 경우가 있어서 파일로 넘긴다.
+        host = wsl_ip() if IS_WSL and is_windows_exe(WEBOTS) else '127.0.0.1'
+        try:
+            (HERE / 'gcs_target.json').write_text(json.dumps({'host': host, 'port': PORT}), encoding='utf-8')
+        except OSError as error:
+            self.log(f'[GCS] gcs_target.json 을 쓰지 못했습니다: {error}')
+        if host != '127.0.0.1':
+            self.log(f'[GCS] WSL 모드: Windows Webots → {host}:{PORT} 로 받습니다')
         args = ['--stdout', '--stderr']
         args += (['--mode=fast', '--no-rendering', '--minimize'] if self.mode_combo.currentIndex() == 1
                  else ['--mode=realtime'])
-        args.append(str(world))
+        args.append(to_webots_path(world))
         self.run_id = None
         self.ignored = set()
         self.view.reset()

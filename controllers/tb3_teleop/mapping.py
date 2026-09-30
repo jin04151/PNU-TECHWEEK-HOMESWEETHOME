@@ -40,6 +40,7 @@ ROBOT_RADIUS = 0.10
 
 GCS_ENABLED = os.environ.get('AMR_GCS', '1') != '0'
 GCS_PORT = int(os.environ.get('AMR_GCS_PORT', '5600'))
+GCS_HOST = os.environ.get('AMR_GCS_HOST', '127.0.0.1')   # GCS 가 WSL 에서 돌면 gcs.py 가 WSL IP 를 넣어 준다
 GCS_PERIOD = 0.2
 GCS_MAP_PERIOD = 1.0
 GCS_MAX_POINTS = 400
@@ -575,6 +576,16 @@ class _Telemetry:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.setblocking(False)
         self.run_id = os.environ.get('AMR_GCS_RUN_ID') or str(os.getpid())
+        # gcs.py 가 실행할 때 저장소 폴더에 받을 주소를 적어 둔다(WSL 의 GCS 로 보낼 때 필요).
+        self.address = (GCS_HOST, GCS_PORT)
+        target = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'gcs_target.json')
+        if 'AMR_GCS_HOST' not in os.environ:
+            try:
+                with open(target, encoding='utf-8') as handle:
+                    info = json.load(handle)
+                self.address = (str(info.get('host', GCS_HOST)), int(info.get('port', GCS_PORT)))
+            except (OSError, ValueError):
+                pass
         self.next_send = 0.0
         self.next_map = 0.0
         self.started = time.monotonic()
@@ -607,7 +618,7 @@ class _Telemetry:
                 blob = zlib.compress(grid.data.tobytes(), 3)
             text = json.dumps(header, separators=(',', ':')).encode('utf-8')
             self.socket.sendto(b'AMR2' + struct.pack('<I', len(text)) + text + blob,
-                               ('127.0.0.1', GCS_PORT))
+                               self.address)
         except (OSError, ValueError):
             pass
 
