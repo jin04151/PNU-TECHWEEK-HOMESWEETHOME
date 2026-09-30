@@ -63,9 +63,12 @@ def _search(grid, safe_grid, pose):
     if not all(math.isfinite(v) for v in (pose.x, pose.y)):
         return distance, heading
     start = grid.world_to_grid(pose.x, pose.y)
-    walkable = (grid.data == FREE) & ~blocked
-    if start is None or not walkable[start]:
+    if start is None or grid.data[start] != FREE:
         return distance, heading
+    walkable = (grid.data == FREE) & ~blocked
+    # FREE인 현재 위치만 inflation 차단 예외로 둔다. 원본 safe_grid는 유지한다.
+    # 주변 셀은 기존 안전 조건을 만족해야 BFS가 확장된다.
+    walkable[start] = True
     distance[start] = 0
     queue = deque([start])
     while queue:
@@ -330,8 +333,6 @@ class Diagnostics:
             reason = '시작 셀이 Unknown'
         elif grid.data[start] != FREE:
             reason = '시작 셀이 Free가 아님'
-        elif safe_grid[start]:
-            reason = '시작 셀이 차단됨'
         elif not frontier.any():
             reason = 'Frontier 없음'
         elif not reachable.any():
